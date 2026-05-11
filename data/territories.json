@@ -1,0 +1,457 @@
+[
+  {
+    "id": "germany", "name": "Germany", "ownerId": "germany", "originalOwnerId": "germany",
+    "terrain": "plains", "isCoastal": true, "geoId": "276", "centroid": [10.4, 51.1],
+    "industryOutput": 60, "manpowerOutput": 800, "resourceOutput": { "steel": 40, "food": 30 },
+    "garrison": 20, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["france", "belgium", "netherlands", "denmark", "poland", "austria", "switzerland", "slovakia"]
+  },
+  {
+    "id": "austria", "name": "Austria", "ownerId": "germany", "originalOwnerId": "austria",
+    "terrain": "mountain", "isCoastal": false, "geoId": "40", "centroid": [14.5, 47.5],
+    "industryOutput": 20, "manpowerOutput": 200, "resourceOutput": { "steel": 10, "food": 15 },
+    "garrison": 5, "fortLevel": 1, "supplyLevel": 0.9,
+    "adjacentTo": ["germany", "switzerland", "italy", "hungary", "yugoslavia", "slovakia"]
+  },
+  {
+    "id": "france", "name": "France", "ownerId": "france", "originalOwnerId": "france",
+    "terrain": "plains", "isCoastal": true, "geoId": "250", "centroid": [2.3, 46.2],
+    "industryOutput": 45, "manpowerOutput": 500, "resourceOutput": { "steel": 25, "food": 40 },
+    "garrison": 25, "fortLevel": 3, "supplyLevel": 1.0,
+    "adjacentTo": ["germany", "belgium", "spain", "italy", "switzerland", "uk"]
+  },
+  {
+    "id": "uk", "name": "Britain", "ownerId": "uk", "originalOwnerId": "uk",
+    "terrain": "urban", "isCoastal": true, "geoId": "826", "centroid": [-2.0, 54.0],
+    "industryOutput": 60, "manpowerOutput": 450, "resourceOutput": { "steel": 30, "food": 20 },
+    "garrison": 20, "fortLevel": 3, "supplyLevel": 1.0,
+    "adjacentTo": ["france", "norway", "netherlands", "belgium", "denmark"]
+  },
+  {
+    "id": "italy", "name": "Italy", "ownerId": "italy", "originalOwnerId": "italy",
+    "terrain": "plains", "isCoastal": true, "geoId": "380", "centroid": [12.5, 42.5],
+    "industryOutput": 30, "manpowerOutput": 400, "resourceOutput": { "food": 25, "steel": 10 },
+    "garrison": 15, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["france", "austria", "switzerland", "yugoslavia", "albania", "greece", "libya", "tunisia", "egypt"]
+  },
+  {
+    "id": "spain", "name": "Spain", "ownerId": "spain", "originalOwnerId": "spain",
+    "terrain": "plains", "isCoastal": true, "geoId": "724", "centroid": [-3.7, 40.4],
+    "industryOutput": 20, "manpowerOutput": 300, "resourceOutput": { "food": 25, "steel": 10 },
+    "garrison": 15, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["france", "portugal", "morocco"]
+  },
+  {
+    "id": "portugal", "name": "Portugal", "ownerId": "portugal", "originalOwnerId": "portugal",
+    "terrain": "plains", "isCoastal": true, "geoId": "620", "centroid": [-8.2, 39.4],
+    "industryOutput": 8, "manpowerOutput": 80, "resourceOutput": { "food": 15 },
+    "garrison": 5, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["spain", "angola", "brazil"]
+  },
+  {
+    "id": "norway", "name": "Norway", "ownerId": "norway", "originalOwnerId": "norway",
+    "terrain": "mountain", "isCoastal": true, "geoId": "578", "centroid": [8.5, 60.5],
+    "industryOutput": 8, "manpowerOutput": 60, "resourceOutput": { "food": 10 },
+    "garrison": 4, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["sweden", "finland", "uk", "denmark"]
+  },
+  {
+    "id": "sweden", "name": "Sweden", "ownerId": "sweden", "originalOwnerId": "sweden",
+    "terrain": "forest", "isCoastal": true, "geoId": "752", "centroid": [17.0, 63.0],
+    "industryOutput": 15, "manpowerOutput": 80, "resourceOutput": { "steel": 30, "food": 15 },
+    "garrison": 6, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["norway", "finland", "denmark"]
+  },
+  {
+    "id": "denmark", "name": "Denmark", "ownerId": "denmark", "originalOwnerId": "denmark",
+    "terrain": "plains", "isCoastal": true, "geoId": "208", "centroid": [10.0, 56.0],
+    "industryOutput": 8, "manpowerOutput": 60, "resourceOutput": { "food": 15 },
+    "garrison": 4, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["germany", "norway", "sweden", "uk"]
+  },
+  {
+    "id": "finland", "name": "Finland", "ownerId": "finland", "originalOwnerId": "finland",
+    "terrain": "forest", "isCoastal": true, "geoId": "246", "centroid": [26.0, 64.0],
+    "industryOutput": 8, "manpowerOutput": 50, "resourceOutput": { "food": 10 },
+    "garrison": 8, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["norway", "sweden", "ussr"]
+  },
+  {
+    "id": "poland", "name": "Poland", "ownerId": "poland", "originalOwnerId": "poland",
+    "terrain": "plains", "isCoastal": true, "geoId": "616", "centroid": [19.1, 51.9],
+    "industryOutput": 20, "manpowerOutput": 350, "resourceOutput": { "steel": 10, "food": 30 },
+    "garrison": 20, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["germany", "ussr", "romania", "hungary", "slovakia", "austria"]
+  },
+  {
+    "id": "netherlands", "name": "Netherlands", "ownerId": "netherlands", "originalOwnerId": "netherlands",
+    "terrain": "plains", "isCoastal": true, "geoId": "528", "centroid": [5.3, 52.1],
+    "industryOutput": 20, "manpowerOutput": 90, "resourceOutput": { "food": 15 },
+    "garrison": 5, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["germany", "belgium", "uk"]
+  },
+  {
+    "id": "belgium", "name": "Belgium", "ownerId": "belgium", "originalOwnerId": "belgium",
+    "terrain": "plains", "isCoastal": true, "geoId": "56", "centroid": [4.5, 50.5],
+    "industryOutput": 25, "manpowerOutput": 90, "resourceOutput": { "steel": 15, "food": 10 },
+    "garrison": 7, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["france", "germany", "netherlands", "uk"]
+  },
+  {
+    "id": "switzerland", "name": "Switzerland", "ownerId": "switzerland", "originalOwnerId": "switzerland",
+    "terrain": "mountain", "isCoastal": false, "geoId": "756", "centroid": [8.2, 46.8],
+    "industryOutput": 10, "manpowerOutput": 50, "resourceOutput": { "food": 8 },
+    "garrison": 6, "fortLevel": 3, "supplyLevel": 1.0,
+    "adjacentTo": ["germany", "france", "italy", "austria"]
+  },
+  {
+    "id": "hungary", "name": "Hungary", "ownerId": "hungary", "originalOwnerId": "hungary",
+    "terrain": "plains", "isCoastal": false, "geoId": "348", "centroid": [19.5, 47.2],
+    "industryOutput": 15, "manpowerOutput": 120, "resourceOutput": { "oil": 5, "food": 20 },
+    "garrison": 8, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["germany", "austria", "romania", "yugoslavia", "slovakia", "poland"]
+  },
+  {
+    "id": "romania", "name": "Romania", "ownerId": "romania", "originalOwnerId": "romania",
+    "terrain": "plains", "isCoastal": true, "geoId": "642", "centroid": [25.0, 45.9],
+    "industryOutput": 18, "manpowerOutput": 200, "resourceOutput": { "oil": 30, "food": 25 },
+    "garrison": 12, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["hungary", "yugoslavia", "bulgaria", "ussr", "poland"]
+  },
+  {
+    "id": "bulgaria", "name": "Bulgaria", "ownerId": "bulgaria", "originalOwnerId": "bulgaria",
+    "terrain": "plains", "isCoastal": true, "geoId": "100", "centroid": [25.5, 42.7],
+    "industryOutput": 8, "manpowerOutput": 80, "resourceOutput": { "food": 15 },
+    "garrison": 8, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["romania", "yugoslavia", "greece", "turkey"]
+  },
+  {
+    "id": "yugoslavia", "name": "Yugoslavia", "ownerId": "yugoslavia", "originalOwnerId": "yugoslavia",
+    "terrain": "mountain", "isCoastal": true, "geoId": "688", "centroid": [20.9, 44.0],
+    "industryOutput": 12, "manpowerOutput": 150, "resourceOutput": { "food": 20, "steel": 5 },
+    "garrison": 10, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["italy", "austria", "hungary", "romania", "bulgaria", "greece", "albania"]
+  },
+  {
+    "id": "greece", "name": "Greece", "ownerId": "greece", "originalOwnerId": "greece",
+    "terrain": "mountain", "isCoastal": true, "geoId": "300", "centroid": [21.8, 39.1],
+    "industryOutput": 8, "manpowerOutput": 80, "resourceOutput": { "food": 15 },
+    "garrison": 8, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["yugoslavia", "bulgaria", "albania", "turkey", "italy"]
+  },
+  {
+    "id": "albania", "name": "Albania", "ownerId": "italy", "originalOwnerId": "albania",
+    "terrain": "mountain", "isCoastal": true, "geoId": "8", "centroid": [20.1, 41.3],
+    "industryOutput": 3, "manpowerOutput": 15, "resourceOutput": { "oil": 5 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.8,
+    "adjacentTo": ["yugoslavia", "greece", "italy"]
+  },
+  {
+    "id": "turkey", "name": "Turkey", "ownerId": "turkey", "originalOwnerId": "turkey",
+    "terrain": "plains", "isCoastal": true, "geoId": "792", "centroid": [35.2, 38.9],
+    "industryOutput": 12, "manpowerOutput": 180, "resourceOutput": { "food": 20 },
+    "garrison": 12, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["greece", "bulgaria", "ussr", "syria", "iraq", "iran"]
+  },
+  {
+    "id": "slovakia", "name": "Slovakia", "ownerId": "slovakia", "originalOwnerId": "slovakia",
+    "terrain": "plains", "isCoastal": false, "geoId": "703", "centroid": [19.7, 48.7],
+    "industryOutput": 8, "manpowerOutput": 50, "resourceOutput": { "food": 10 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.9,
+    "adjacentTo": ["germany", "hungary", "poland", "austria", "ussr"]
+  },
+  {
+    "id": "ussr", "name": "Soviet Union", "ownerId": "ussr", "originalOwnerId": "ussr",
+    "terrain": "plains", "isCoastal": true, "geoId": "643", "centroid": [60.0, 55.0],
+    "industryOutput": 100, "manpowerOutput": 2000, "resourceOutput": { "oil": 80, "steel": 80, "food": 80 },
+    "garrison": 60, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["finland", "poland", "romania", "hungary", "turkey", "iran", "afghanistan", "mongolia", "manchuria", "china", "japan"]
+  },
+  {
+    "id": "japan", "name": "Japan", "ownerId": "japan", "originalOwnerId": "japan",
+    "terrain": "urban", "isCoastal": true, "geoId": "392", "centroid": [136.0, 36.0],
+    "industryOutput": 55, "manpowerOutput": 700, "resourceOutput": { "steel": 30, "food": 30 },
+    "garrison": 20, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["korea", "china-north", "philippines", "ussr"]
+  },
+  {
+    "id": "korea", "name": "Korea", "ownerId": "japan", "originalOwnerId": "korea",
+    "terrain": "plains", "isCoastal": true, "geoId": "410", "centroid": [127.8, 36.0],
+    "industryOutput": 15, "manpowerOutput": 250, "resourceOutput": { "steel": 10, "food": 20 },
+    "garrison": 8, "fortLevel": 1, "supplyLevel": 0.9,
+    "adjacentTo": ["japan", "manchuria", "china-north", "ussr"]
+  },
+  {
+    "id": "manchuria", "name": "Manchuria", "ownerId": "japan", "originalOwnerId": "china",
+    "terrain": "plains", "isCoastal": true, "geoId": "408", "centroid": [123.0, 44.5],
+    "industryOutput": 20, "manpowerOutput": 300, "resourceOutput": { "steel": 20, "food": 25, "oil": 5 },
+    "garrison": 15, "fortLevel": 2, "supplyLevel": 0.9,
+    "adjacentTo": ["korea", "china-north", "mongolia", "ussr"]
+  },
+  {
+    "id": "china-north", "name": "North China", "ownerId": "japan", "originalOwnerId": "china",
+    "terrain": "plains", "isCoastal": true, "geoId": "158", "centroid": [115.0, 38.0],
+    "industryOutput": 10, "manpowerOutput": 800, "resourceOutput": { "food": 40, "steel": 5 },
+    "garrison": 20, "fortLevel": 1, "supplyLevel": 0.8,
+    "adjacentTo": ["manchuria", "korea", "mongolia", "china", "japan", "ussr"]
+  },
+  {
+    "id": "china", "name": "China", "ownerId": "china", "originalOwnerId": "china",
+    "terrain": "plains", "isCoastal": true, "geoId": "156", "centroid": [104.0, 30.0],
+    "industryOutput": 15, "manpowerOutput": 5000, "resourceOutput": { "food": 100, "oil": 5, "steel": 5 },
+    "garrison": 40, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["china-north", "mongolia", "ussr", "india", "burma", "vietnam", "thailand"]
+  },
+  {
+    "id": "mongolia", "name": "Mongolia", "ownerId": "mongolia", "originalOwnerId": "mongolia",
+    "terrain": "desert", "isCoastal": false, "geoId": "496", "centroid": [103.8, 46.9],
+    "industryOutput": 3, "manpowerOutput": 10, "resourceOutput": { "food": 10 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.8,
+    "adjacentTo": ["ussr", "china-north", "china", "manchuria"]
+  },
+  {
+    "id": "india", "name": "India", "ownerId": "uk", "originalOwnerId": "india",
+    "terrain": "plains", "isCoastal": true, "geoId": "356", "centroid": [80.0, 22.0],
+    "industryOutput": 25, "manpowerOutput": 3000, "resourceOutput": { "food": 80, "oil": 10 },
+    "garrison": 10, "fortLevel": 1, "supplyLevel": 0.8,
+    "adjacentTo": ["burma", "china", "iran", "ussr"]
+  },
+  {
+    "id": "burma", "name": "Burma", "ownerId": "uk", "originalOwnerId": "burma",
+    "terrain": "jungle", "isCoastal": true, "geoId": "104", "centroid": [96.0, 20.0],
+    "industryOutput": 5, "manpowerOutput": 150, "resourceOutput": { "oil": 15, "food": 20 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.7,
+    "adjacentTo": ["india", "china", "thailand", "malaysia"]
+  },
+  {
+    "id": "vietnam", "name": "Indochina", "ownerId": "france", "originalOwnerId": "vietnam",
+    "terrain": "jungle", "isCoastal": true, "geoId": "704", "centroid": [106.0, 16.0],
+    "industryOutput": 5, "manpowerOutput": 200, "resourceOutput": { "food": 25, "oil": 5 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.6,
+    "adjacentTo": ["china", "thailand", "malaysia"]
+  },
+  {
+    "id": "thailand", "name": "Thailand", "ownerId": "thailand", "originalOwnerId": "thailand",
+    "terrain": "jungle", "isCoastal": true, "geoId": "764", "centroid": [101.0, 15.5],
+    "industryOutput": 5, "manpowerOutput": 150, "resourceOutput": { "food": 30 },
+    "garrison": 6, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["malaysia", "vietnam", "burma", "china"]
+  },
+  {
+    "id": "malaysia", "name": "Malaya", "ownerId": "uk", "originalOwnerId": "malaysia",
+    "terrain": "jungle", "isCoastal": true, "geoId": "458", "centroid": [109.7, 4.2],
+    "industryOutput": 8, "manpowerOutput": 100, "resourceOutput": { "oil": 20, "steel": 5, "food": 15 },
+    "garrison": 3, "fortLevel": 1, "supplyLevel": 0.7,
+    "adjacentTo": ["thailand", "burma", "indonesia", "philippines"]
+  },
+  {
+    "id": "indonesia", "name": "Dutch East Indies", "ownerId": "netherlands", "originalOwnerId": "indonesia",
+    "terrain": "jungle", "isCoastal": true, "geoId": "360", "centroid": [118.0, -2.0],
+    "industryOutput": 8, "manpowerOutput": 400, "resourceOutput": { "oil": 50, "food": 30 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.6,
+    "adjacentTo": ["malaysia", "philippines", "australia", "new-guinea"]
+  },
+  {
+    "id": "philippines", "name": "Philippines", "ownerId": "usa", "originalOwnerId": "philippines",
+    "terrain": "jungle", "isCoastal": true, "geoId": "608", "centroid": [122.0, 12.0],
+    "industryOutput": 5, "manpowerOutput": 150, "resourceOutput": { "food": 20 },
+    "garrison": 5, "fortLevel": 1, "supplyLevel": 0.6,
+    "adjacentTo": ["japan", "malaysia", "indonesia", "china-north"]
+  },
+  {
+    "id": "iran", "name": "Iran", "ownerId": "iran", "originalOwnerId": "iran",
+    "terrain": "desert", "isCoastal": true, "geoId": "364", "centroid": [53.7, 32.4],
+    "industryOutput": 10, "manpowerOutput": 150, "resourceOutput": { "oil": 60, "food": 15 },
+    "garrison": 8, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["turkey", "ussr", "iraq", "india"]
+  },
+  {
+    "id": "iraq", "name": "Iraq", "ownerId": "iraq", "originalOwnerId": "iraq",
+    "terrain": "desert", "isCoastal": true, "geoId": "368", "centroid": [44.4, 33.2],
+    "industryOutput": 5, "manpowerOutput": 50, "resourceOutput": { "oil": 40, "food": 10 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["turkey", "iran", "saudi-arabia", "syria", "egypt"]
+  },
+  {
+    "id": "saudi-arabia", "name": "Saudi Arabia", "ownerId": "saudi-arabia", "originalOwnerId": "saudi-arabia",
+    "terrain": "desert", "isCoastal": true, "geoId": "682", "centroid": [45.0, 24.0],
+    "industryOutput": 3, "manpowerOutput": 60, "resourceOutput": { "oil": 80, "food": 5 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["iraq", "egypt", "sudan"]
+  },
+  {
+    "id": "egypt", "name": "Egypt", "ownerId": "uk", "originalOwnerId": "egypt",
+    "terrain": "desert", "isCoastal": true, "geoId": "818", "centroid": [30.0, 26.0],
+    "industryOutput": 8, "manpowerOutput": 200, "resourceOutput": { "oil": 10, "food": 20 },
+    "garrison": 8, "fortLevel": 2, "supplyLevel": 0.8,
+    "adjacentTo": ["libya", "sudan", "iraq", "saudi-arabia", "italy", "turkey"]
+  },
+  {
+    "id": "syria", "name": "Syria & Lebanon", "ownerId": "france", "originalOwnerId": "syria",
+    "terrain": "desert", "isCoastal": true, "geoId": "760", "centroid": [38.0, 35.0],
+    "industryOutput": 5, "manpowerOutput": 50, "resourceOutput": { "food": 10 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.6,
+    "adjacentTo": ["turkey", "iraq", "egypt"]
+  },
+  {
+    "id": "libya", "name": "Libya", "ownerId": "italy", "originalOwnerId": "libya",
+    "terrain": "desert", "isCoastal": true, "geoId": "434", "centroid": [17.2, 26.3],
+    "industryOutput": 3, "manpowerOutput": 15, "resourceOutput": { "oil": 10 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 0.7,
+    "adjacentTo": ["italy", "egypt", "algeria", "tunisia", "ethiopia"]
+  },
+  {
+    "id": "ethiopia", "name": "Ethiopia", "ownerId": "italy", "originalOwnerId": "ethiopia",
+    "terrain": "mountain", "isCoastal": false, "geoId": "231", "centroid": [39.6, 8.6],
+    "industryOutput": 3, "manpowerOutput": 100, "resourceOutput": { "food": 20 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 0.5,
+    "adjacentTo": ["somalia", "sudan", "kenya", "egypt", "libya"]
+  },
+  {
+    "id": "somalia", "name": "Somaliland", "ownerId": "italy", "originalOwnerId": "somalia",
+    "terrain": "desert", "isCoastal": true, "geoId": "706", "centroid": [45.3, 6.0],
+    "industryOutput": 1, "manpowerOutput": 20, "resourceOutput": {},
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.5,
+    "adjacentTo": ["ethiopia", "kenya"]
+  },
+  {
+    "id": "algeria", "name": "Algeria", "ownerId": "france", "originalOwnerId": "algeria",
+    "terrain": "desert", "isCoastal": true, "geoId": "12", "centroid": [2.6, 28.2],
+    "industryOutput": 5, "manpowerOutput": 80, "resourceOutput": { "oil": 5, "food": 15 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.6,
+    "adjacentTo": ["morocco", "tunisia", "libya"]
+  },
+  {
+    "id": "morocco", "name": "Morocco", "ownerId": "spain", "originalOwnerId": "morocco",
+    "terrain": "desert", "isCoastal": true, "geoId": "504", "centroid": [-7.1, 31.8],
+    "industryOutput": 5, "manpowerOutput": 100, "resourceOutput": { "food": 15 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 0.7,
+    "adjacentTo": ["spain", "algeria"]
+  },
+  {
+    "id": "tunisia", "name": "Tunisia", "ownerId": "france", "originalOwnerId": "tunisia",
+    "terrain": "desert", "isCoastal": true, "geoId": "788", "centroid": [9.6, 33.9],
+    "industryOutput": 3, "manpowerOutput": 30, "resourceOutput": { "food": 10 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.6,
+    "adjacentTo": ["algeria", "libya", "italy"]
+  },
+  {
+    "id": "nigeria", "name": "West Africa", "ownerId": "uk", "originalOwnerId": "nigeria",
+    "terrain": "jungle", "isCoastal": true, "geoId": "566", "centroid": [8.7, 9.1],
+    "industryOutput": 5, "manpowerOutput": 200, "resourceOutput": { "oil": 5, "food": 30 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.5,
+    "adjacentTo": ["fr-west-africa", "belgian-congo"]
+  },
+  {
+    "id": "fr-west-africa", "name": "French W. Africa", "ownerId": "france", "originalOwnerId": "fr-west-africa",
+    "terrain": "desert", "isCoastal": true, "geoId": "466", "centroid": [-2.0, 17.0],
+    "industryOutput": 3, "manpowerOutput": 100, "resourceOutput": { "food": 15 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.4,
+    "adjacentTo": ["morocco", "algeria", "nigeria", "belgian-congo"]
+  },
+  {
+    "id": "belgian-congo", "name": "Belgian Congo", "ownerId": "belgium", "originalOwnerId": "belgian-congo",
+    "terrain": "jungle", "isCoastal": true, "geoId": "180", "centroid": [24.0, -2.0],
+    "industryOutput": 5, "manpowerOutput": 150, "resourceOutput": { "food": 20, "steel": 10 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.4,
+    "adjacentTo": ["nigeria", "fr-west-africa", "kenya", "angola"]
+  },
+  {
+    "id": "kenya", "name": "East Africa", "ownerId": "uk", "originalOwnerId": "kenya",
+    "terrain": "plains", "isCoastal": true, "geoId": "404", "centroid": [38.0, -1.0],
+    "industryOutput": 3, "manpowerOutput": 100, "resourceOutput": { "food": 20 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.5,
+    "adjacentTo": ["ethiopia", "somalia", "sudan", "belgian-congo", "south-africa"]
+  },
+  {
+    "id": "sudan", "name": "Sudan", "ownerId": "uk", "originalOwnerId": "sudan",
+    "terrain": "desert", "isCoastal": false, "geoId": "729", "centroid": [30.0, 15.0],
+    "industryOutput": 3, "manpowerOutput": 80, "resourceOutput": { "food": 15 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 0.5,
+    "adjacentTo": ["egypt", "ethiopia", "kenya", "saudi-arabia"]
+  },
+  {
+    "id": "south-africa", "name": "South Africa", "ownerId": "south-africa", "originalOwnerId": "south-africa",
+    "terrain": "plains", "isCoastal": true, "geoId": "710", "centroid": [25.0, -29.0],
+    "industryOutput": 10, "manpowerOutput": 110, "resourceOutput": { "steel": 20, "food": 20 },
+    "garrison": 4, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["kenya", "angola", "mozambique"]
+  },
+  {
+    "id": "angola", "name": "Angola", "ownerId": "portugal", "originalOwnerId": "angola",
+    "terrain": "jungle", "isCoastal": true, "geoId": "24", "centroid": [17.9, -11.2],
+    "industryOutput": 3, "manpowerOutput": 50, "resourceOutput": { "oil": 10, "food": 10 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.4,
+    "adjacentTo": ["belgian-congo", "south-africa"]
+  },
+  {
+    "id": "mozambique", "name": "Mozambique", "ownerId": "portugal", "originalOwnerId": "mozambique",
+    "terrain": "plains", "isCoastal": true, "geoId": "508", "centroid": [35.0, -18.0],
+    "industryOutput": 2, "manpowerOutput": 50, "resourceOutput": { "food": 10 },
+    "garrison": 1, "fortLevel": 0, "supplyLevel": 0.4,
+    "adjacentTo": ["kenya", "south-africa"]
+  },
+  {
+    "id": "madagascar", "name": "Madagascar", "ownerId": "france", "originalOwnerId": "madagascar",
+    "terrain": "jungle", "isCoastal": true, "geoId": "450", "centroid": [46.9, -18.8],
+    "industryOutput": 2, "manpowerOutput": 40, "resourceOutput": { "food": 10 },
+    "garrison": 1, "fortLevel": 0, "supplyLevel": 0.3,
+    "adjacentTo": ["mozambique", "south-africa"]
+  },
+  {
+    "id": "usa", "name": "United States", "ownerId": "usa", "originalOwnerId": "usa",
+    "terrain": "plains", "isCoastal": true, "geoId": "840", "centroid": [-100.0, 40.0],
+    "industryOutput": 150, "manpowerOutput": 1300, "resourceOutput": { "oil": 200, "steel": 200, "food": 150 },
+    "garrison": 10, "fortLevel": 2, "supplyLevel": 1.0,
+    "adjacentTo": ["canada", "mexico", "uk", "philippines", "australia"]
+  },
+  {
+    "id": "canada", "name": "Canada", "ownerId": "canada", "originalOwnerId": "canada",
+    "terrain": "forest", "isCoastal": true, "geoId": "124", "centroid": [-95.0, 60.0],
+    "industryOutput": 20, "manpowerOutput": 110, "resourceOutput": { "oil": 10, "steel": 30, "food": 40 },
+    "garrison": 3, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["usa", "uk"]
+  },
+  {
+    "id": "brazil", "name": "Brazil", "ownerId": "brazil", "originalOwnerId": "brazil",
+    "terrain": "jungle", "isCoastal": true, "geoId": "76", "centroid": [-52.0, -10.0],
+    "industryOutput": 15, "manpowerOutput": 420, "resourceOutput": { "food": 50, "steel": 10 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["argentina", "mexico"]
+  },
+  {
+    "id": "mexico", "name": "Mexico", "ownerId": "mexico", "originalOwnerId": "mexico",
+    "terrain": "plains", "isCoastal": true, "geoId": "484", "centroid": [-102.5, 24.0],
+    "industryOutput": 10, "manpowerOutput": 200, "resourceOutput": { "oil": 20, "food": 30 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["usa", "brazil"]
+  },
+  {
+    "id": "argentina", "name": "Argentina", "ownerId": "argentina", "originalOwnerId": "argentina",
+    "terrain": "plains", "isCoastal": true, "geoId": "32", "centroid": [-65.0, -35.0],
+    "industryOutput": 10, "manpowerOutput": 140, "resourceOutput": { "food": 40, "oil": 10 },
+    "garrison": 5, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["brazil"]
+  },
+  {
+    "id": "australia", "name": "Australia", "ownerId": "australia", "originalOwnerId": "australia",
+    "terrain": "desert", "isCoastal": true, "geoId": "36", "centroid": [135.0, -25.0],
+    "industryOutput": 12, "manpowerOutput": 70, "resourceOutput": { "steel": 20, "food": 30 },
+    "garrison": 5, "fortLevel": 1, "supplyLevel": 1.0,
+    "adjacentTo": ["new-zealand", "indonesia", "new-guinea", "malaysia", "india"]
+  },
+  {
+    "id": "new-zealand", "name": "New Zealand", "ownerId": "australia", "originalOwnerId": "new-zealand",
+    "terrain": "mountain", "isCoastal": true, "geoId": "554", "centroid": [172.0, -41.0],
+    "industryOutput": 5, "manpowerOutput": 20, "resourceOutput": { "food": 15 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 1.0,
+    "adjacentTo": ["australia"]
+  },
+  {
+    "id": "new-guinea", "name": "New Guinea", "ownerId": "australia", "originalOwnerId": "new-guinea",
+    "terrain": "jungle", "isCoastal": true, "geoId": "598", "centroid": [143.0, -6.0],
+    "industryOutput": 2, "manpowerOutput": 30, "resourceOutput": { "food": 10 },
+    "garrison": 2, "fortLevel": 0, "supplyLevel": 0.5,
+    "adjacentTo": ["australia", "indonesia", "philippines"]
+  }
+]
