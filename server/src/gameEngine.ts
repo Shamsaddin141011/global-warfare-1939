@@ -2,7 +2,8 @@ import { GameState, PlayerAction, MoveAction, ReinforceAction, BuildAction, Rese
 import { resolveCombat } from '../../shared/src/combat';
 import { tickEconomy } from '../../shared/src/economy';
 import { generateAIActions } from '../../shared/src/aiLogic';
-import { RESEARCH_CATEGORIES } from '../../shared/src/constants';
+import { RESEARCH_CATEGORIES, productionCap } from '../../shared/src/constants';
+import { findCorridor, buildAttackOption } from '../../shared/src/routing';
 
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -19,10 +20,13 @@ export function advanceTurn(state: GameState): { combatResults: CombatResult[]; 
     }
   }
 
+  // Dedup research actions: only the first per country/category counts each turn
+  const researchedThisTurn = new Map<string, Set<string>>();
+
   // Process all actions
   let actionIndex = 0;
   for (const action of state.pendingActions) {
-    processAction(action, state, combatResults, events, actionIndex++);
+    processAction(action, state, combatResults, events, actionIndex++, researchedThisTurn);
   }
 
   // Economy tick
@@ -39,7 +43,9 @@ export function advanceTurn(state: GameState): { combatResults: CombatResult[]; 
   checkVictory(state, events);
 
   state.turn += 1;
-  state.phase = state.year >= 1945 ? 'ended' : 'planning';
+  if (state.phase !== 'ended') {
+    state.phase = (state.year >= 1945 && state.month >= 9) ? 'ended' : 'planning';
+  }
   state.submittedPlayers = [];
   state.pendingActions = [];
   state.turnStartTime = Date.now();
@@ -54,7 +60,8 @@ function processAction(
   state: GameState,
   combatResults: CombatResult[],
   events: GameEvent[],
-  idx: number
+  idx: number,
+  researchedThisTurn: Map<string, Set<string>>
 ): void {
   const country = state.countries[action.countryId];
   if (!country) return;
@@ -67,8 +74,22 @@ function processAction(
       if (!fromT || !toT) return;
       if (fromT.ownerId !== action.countryId) return;
 
+      // Find route from source to target through owned territories.
+      // path.length === 1 means direct adjacency; >1 means corridor.
+      const path = findCorridor(state, fromT.id, toT.id, action.countryId);
+      if (!path) return; // unreachable
+
+      const route = buildAttackOption(path);
+      const launchPoint = state.territories[route.launchPointId];
+      if (!launchPoint) return;
+
+      // Naval invasion check uses the LAUNCH POINT, not the source territory
+      const isLandAdj = launchPoint.adjacentTo.includes(toT.id);
+      const isSeaAdj = launchPoint.navalAdjacentTo?.includes(toT.id) ?? false;
+      const isNaval = !isLandAdj && isSeaAdj;
+
       if (toT.ownerId === action.countryId) {
-        // Friendly move
+        // Friendly move — troops physically move from source to target along the corridor
         const moved = Math.min(d.forceSize, fromT.garrison - 1);
         if (moved <= 0) return;
         fromT.garrison -= moved;
@@ -97,7 +118,7 @@ function processAction(
       const force = Math.min(d.forceSize, fromT.garrison - 1);
       if (force <= 0) return;
 
-      const result = resolveCombat(country, defCountry, force, fromT, toT, state.turn, idx);
+      const result = resolveCombat(country, defCountry, force, fromT, toT, state.turn, idx, isNaval, route.supplyMult);
       combatResults.push(result);
 
       fromT.garrison -= result.attackerLosses;
@@ -106,9 +127,9 @@ function processAction(
       defCountry.army = Math.max(0, defCountry.army - result.defenderLosses);
 
       if (result.captured) {
-        const remainingForce = force - result.attackerLosses;
+        const remainingForce = Math.max(1, force - result.attackerLosses);
         fromT.garrison -= (force - result.attackerLosses);
-        toT.garrison = Math.floor(remainingForce * 0.5);
+        toT.garrison = remainingForce;
         toT.ownerId = action.countryId;
         country.territories.push(toT.id);
         defCountry.territories = defCountry.territories.filter(id => id !== toT.id);
@@ -136,10 +157,24 @@ function processAction(
       const d = action.data as ReinforceAction;
       const t = state.territories[d.territoryId];
       if (!t || t.ownerId !== action.countryId) return;
-      const added = Math.min(d.divisions, Math.floor(country.manpower / 100));
-      t.garrison += added;
-      country.army += added;
-      country.manpower -= added * 100;
+
+      // 1 division = 8 steel + 2 oil + 10 money + 150 manpower
+      const STEEL_PER = 8, OIL_PER = 2, MONEY_PER = 10, MANPOWER_PER = 150;
+      const maxByManpower = Math.floor(country.manpower / MANPOWER_PER);
+      const maxBySteel    = Math.floor(country.resources.steel / STEEL_PER);
+      const maxByOil      = OIL_PER > 0 ? Math.floor(country.resources.oil / OIL_PER) : Number.MAX_SAFE_INTEGER;
+      const maxByMoney    = Math.floor(country.money / MONEY_PER);
+      const affordable = Math.min(maxByManpower, maxBySteel, maxByOil, maxByMoney);
+      const added = Math.min(d.divisions, Math.max(0, affordable), productionCap(country.army));
+      if (added <= 0) return;
+
+      country.resources.steel -= added * STEEL_PER;
+      country.resources.oil   -= added * OIL_PER;
+      country.money           -= added * MONEY_PER;
+      country.manpower        -= added * MANPOWER_PER;
+
+      t.garrison    += added;
+      country.army  += added;
       break;
     }
 
@@ -154,25 +189,73 @@ function processAction(
       };
       const cost = costs[d.buildType];
       if (!cost) return;
-      const totalMoney = cost.money ? cost.money * d.quantity : 0;
+      const qty = Math.min(d.quantity, productionCap(country.army));
+      const totalMoney = cost.money ? cost.money * qty : 0;
       if (country.money < totalMoney) return;
       country.money -= totalMoney;
-      if (cost.steel) country.resources.steel -= cost.steel * d.quantity;
-      if (cost.oil) country.resources.oil -= cost.oil * d.quantity;
-      country.productionQueue.push({ type: d.buildType, quantity: d.quantity, turnsLeft: cost.turns });
+      if (cost.steel) country.resources.steel -= cost.steel * qty;
+      if (cost.oil) country.resources.oil -= cost.oil * qty;
+      // Spawn target: caller-specified territory if we own it, else capital
+      let spawnId = country.capital;
+      if (d.territoryId && state.territories[d.territoryId]?.ownerId === country.id) {
+        spawnId = d.territoryId;
+      }
+      country.productionQueue.push({
+        type: d.buildType,
+        quantity: qty,
+        turnsLeft: cost.turns,
+        targetTerritoryId: spawnId,
+      });
       break;
     }
 
     case 'research': {
       const d = action.data as ResearchAction;
+      const doneSet = researchedThisTurn.get(action.countryId) ?? new Set<string>();
+      if (doneSet.has(d.category)) break; // already progressed this turn — no spamming
+      doneSet.add(d.category);
+      researchedThisTurn.set(action.countryId, doneSet);
       country.researchProgress[d.category] = (country.researchProgress[d.category] || 0) + 10;
+
       if (country.researchProgress[d.category] >= 100) {
-        country.techLevel = Math.min(5.0, country.techLevel + 0.1);
-        country.researchProgress[d.category] = 100;
+        // Promote to next level — reset progress, bump level, apply specific bonus
+        country.researchProgress[d.category] = 0;
+        if (!country.researchLevel) country.researchLevel = {} as any;
+        const newLevel = (country.researchLevel[d.category] || 0) + 1;
+        country.researchLevel[d.category] = newLevel;
+        country.techLevel = Math.min(8.0, country.techLevel + 0.15);
+
+        let bonusText = '';
+        switch (d.category) {
+          case 'aircraft':
+            country.airPower += 80;
+            bonusText = ` (+80 airpower, lvl ${newLevel})`;
+            break;
+          case 'naval':
+            country.navalPower += 25;
+            bonusText = ` (+25 naval, lvl ${newLevel})`;
+            break;
+          case 'infantry':
+            bonusText = ` (+${newLevel * 4}% ground combat, lvl ${newLevel})`;
+            break;
+          case 'armor':
+            bonusText = ` (+${newLevel * 6}% attack power, lvl ${newLevel})`;
+            break;
+          case 'rockets':
+            bonusText = ` (+${newLevel * 5}% strike strength, lvl ${newLevel})`;
+            break;
+          case 'radar':
+            bonusText = ` (+${newLevel * 3}% defensive accuracy, lvl ${newLevel})`;
+            break;
+          case 'nuclear':
+            bonusText = ` (+${newLevel * 10}% strategic edge, lvl ${newLevel})`;
+            break;
+        }
+
         events.push({
           turn: state.turn, date: `${MONTHS[state.month]} ${state.year}`,
           type: 'research',
-          message: `${country.name} advances ${d.category} technology!`,
+          message: `${country.name} advances ${d.category} technology!${bonusText}`,
           involvedCountries: [country.id],
         });
       }

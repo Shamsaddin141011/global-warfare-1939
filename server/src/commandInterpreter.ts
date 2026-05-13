@@ -1,4 +1,6 @@
 import { GameState, PlayerAction, CommandResult } from '../../shared/src/types';
+import { findCorridor, findAttackOption, buildAttackOption } from '../../shared/src/routing';
+import { productionCap, RESEARCH_DESCRIPTIONS } from '../../shared/src/constants';
 
 export function interpretCommand(
   text: string,
@@ -41,15 +43,24 @@ export function interpretCommand(
   };
   for (const [alias, id] of Object.entries(aliases)) cMap.set(alias, id);
 
+  function escapeRe(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   function findTerritory(s: string): string | null {
-    // Try progressively: exact → strip punctuation → substring scan longest-first
     const stripped = s.replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
     if (tMap.has(stripped)) return tMap.get(stripped)!;
     if (tMap.has(stripped.replace(/\s/g, ''))) return tMap.get(stripped.replace(/\s/g, ''))!;
-    // substring scan longest match first
     const entries = [...tMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    // Pass 1: word-boundary matches — won't match "iran" inside "iranian" or "ire" inside "ireland"
     for (const [key, id] of entries) {
-      if (key.length >= 3 && stripped.includes(key)) return id;
+      if (key.length < 3) continue;
+      const re = new RegExp(`\\b${escapeRe(key)}\\b`);
+      if (re.test(stripped)) return id;
+    }
+    // Pass 2: fallback to substring for hyphenated/multiword names that lost their spaces
+    for (const [key, id] of entries) {
+      if (key.length >= 4 && stripped.includes(key)) return id;
     }
     return null;
   }
@@ -59,7 +70,12 @@ export function interpretCommand(
     if (cMap.has(stripped)) return cMap.get(stripped)!;
     const entries = [...cMap.entries()].sort((a, b) => b[0].length - a[0].length);
     for (const [key, id] of entries) {
-      if (key.length >= 3 && stripped.includes(key)) return id;
+      if (key.length < 3) continue;
+      const re = new RegExp(`\\b${escapeRe(key)}\\b`);
+      if (re.test(stripped)) return id;
+    }
+    for (const [key, id] of entries) {
+      if (key.length >= 4 && stripped.includes(key)) return id;
     }
     return null;
   }
@@ -73,46 +89,89 @@ export function interpretCommand(
   // ── Pattern matching ───────────────────────────────────────────────────────
 
   // ATTACK / MOVE
-  // patterns: "attack France", "invade Poland with 15", "push into Denmark", "send 10 to France"
+  // patterns: "attack France", "invade Poland with 15", "attack X from Y with N divisions", "send 10 to France"
   const isAttack = /\b(attack|invade|assault|strike|push|blitz|march|advance|move troops|send troops|capture|take)\b/.test(lower);
   const isMove   = /\b(move|send|transfer|deploy)\b/.test(lower) && /\b(to|into|toward)\b/.test(lower);
 
   if (isAttack || isMove) {
-    const targetId = findTerritory(lower);
-    if (!targetId) return { ok: false, message: `Couldn't find a territory to target. Try: "attack France" or "invade Poland"` };
+    // Parse explicit "from <territory>" first so it doesn't pollute target detection
+    let workingText = lower;
+    let explicitSourceId: string | null = null;
+    const fromMatch = lower.match(/\bfrom\s+([a-z0-9\-\s]+?)(?:\s+with\b|\s+using\b|$)/);
+    if (fromMatch) {
+      explicitSourceId = findTerritory(fromMatch[1].trim());
+      if (explicitSourceId) {
+        workingText = workingText.replace(fromMatch[0], '').trim();
+      }
+    }
+
+    const targetId = findTerritory(workingText);
+    if (!targetId) return { ok: false, message: `Couldn't find a territory to target. Try: "attack France" or "invade Poland from Germany"` };
 
     const target = state.territories[targetId];
 
-    // Find best source: my adjacent territory with most garrison
-    const sources = country.territories
-      .map(id => state.territories[id])
-      .filter(t => t && t.adjacentTo.includes(targetId) && t.garrison >= 2)
-      .sort((a, b) => b.garrison - a.garrison);
+    // Routing — find a source that can reach the target (direct or via owned corridor)
+    let route: ReturnType<typeof buildAttackOption> | null = null;
+    let fromT: typeof state.territories[string] | null = null;
 
-    if (sources.length === 0) {
-      return { ok: false, message: `No adjacent territory with enough troops to attack ${target.name}. Move troops closer first.` };
+    if (explicitSourceId) {
+      const src = state.territories[explicitSourceId];
+      if (!src) return { ok: false, message: `Unknown source territory.` };
+      if (src.ownerId !== myCountryId) return { ok: false, message: `You don't own ${src.name}.` };
+      if (src.garrison < 2) return { ok: false, message: `${src.name} only has ${src.garrison} divisions — need at least 2 to attack.` };
+      const path = findCorridor(state, src.id, targetId, myCountryId);
+      if (!path) {
+        const land = src.adjacentTo.map(id => state.territories[id]?.name).filter(Boolean).join(', ');
+        const sea = (src.navalAdjacentTo ?? []).map(id => state.territories[id]?.name).filter(Boolean).join(', ');
+        const seaStr = sea ? ` Naval routes: ${sea}.` : '';
+        return { ok: false, message: `${src.name} can't reach ${target.name} — no land/naval route through your territories. Adjacent: ${land}.${seaStr}` };
+      }
+      route = buildAttackOption(path);
+      fromT = src;
+    } else {
+      const opt = findAttackOption(state, targetId, myCountryId);
+      if (!opt) {
+        return { ok: false, message: `Can't reach ${target.name}. None of your territories have a route (direct or through owned land/sea corridor).` };
+      }
+      route = opt;
+      fromT = state.territories[opt.sourceId];
     }
 
-    const fromT = sources[0];
+    if (!fromT || !route) return { ok: false, message: `Routing failed.` };
 
-    // Allow moving to own territory too
+    // Friendly move to own territory — keep it simple, use source garrison directly
     if (target.ownerId === myCountryId) {
       const num = extractNum(lower) ?? Math.floor(fromT.garrison / 2);
       const force = Math.min(Math.max(1, num), fromT.garrison - 1);
+      const pathDesc = route.hops > 1
+        ? ` via ${route.path.slice(1, -1).concat([route.launchPointId]).map(id => state.territories[id]?.name).filter(Boolean).join(' → ')}`
+        : '';
       return {
         ok: true,
-        message: `Moving ${force} divisions from ${fromT.name} → ${target.name}`,
+        message: `Moving ${force} divisions ${fromT.name} → ${target.name}${pathDesc}`,
         action: action('move', { fromTerritoryId: fromT.id, toTerritoryId: targetId, forceSize: force }),
       };
     }
 
     const num = extractNum(lower) ?? Math.floor(fromT.garrison / 2);
-    const force = Math.min(Math.max(1, num), fromT.garrison - 1);
+    const requested = Math.max(1, num);
+    const force = Math.min(requested, fromT.garrison - 1);
     const warNotice = country.atWarWith.includes(target.ownerId) ? '' : ` (auto-declares war on ${state.countries[target.ownerId]?.name})`;
+    const capped = requested > force ? ` — capped from ${requested} (${fromT.name} has ${fromT.garrison} div, max attack = ${fromT.garrison - 1})` : '';
+
+    const launchPointName = state.territories[route.launchPointId]?.name ?? route.launchPointId;
+    const corridorNames = route.path.slice(1).map(id => state.territories[id]?.name).filter(Boolean).join(' → ');
+    const pathDesc = route.hops > 1
+      ? ` via ${corridorNames} (${route.hops}-hop, ${Math.round((1 - route.supplyMult) * 100)}% supply penalty)`
+      : '';
+
+    const isNaval = !state.territories[route.launchPointId]?.adjacentTo.includes(targetId)
+      && (state.territories[route.launchPointId]?.navalAdjacentTo?.includes(targetId) ?? false);
+    const navalTag = isNaval ? ' [naval invasion]' : '';
 
     return {
       ok: true,
-      message: `Attacking ${target.name} from ${fromT.name} with ${force} divisions${warNotice}`,
+      message: `Attacking ${target.name} from ${fromT.name}${pathDesc}${navalTag} with ${force} divisions${capped}${warNotice}`,
       action: action('move', { fromTerritoryId: fromT.id, toTerritoryId: targetId, forceSize: force }),
     };
   }
@@ -125,10 +184,13 @@ export function interpretCommand(
       return { ok: false, message: `${t?.name ?? targetId} is not your territory. You can only reinforce your own.` };
     }
     const num = extractNum(lower) ?? 5;
-    const divisions = Math.max(1, num);
+    const cap = productionCap(country.army);
+    const requested = Math.max(1, num);
+    const divisions = Math.min(requested, cap);
+    const capNote = divisions < requested ? ` (logistics cap: max ${cap} at army size ${country.army})` : '';
     return {
       ok: true,
-      message: `Reinforcing ${state.territories[targetId]?.name} with ${divisions} divisions`,
+      message: `Reinforcing ${state.territories[targetId]?.name} with ${divisions} divisions${capNote}`,
       action: action('reinforce', { territoryId: targetId, divisions }),
     };
   }
@@ -145,10 +207,43 @@ export function interpretCommand(
     let buildType: string | null = null;
     for (const [rx, t] of typeMap) if (rx.test(lower)) { buildType = t; break; }
     if (!buildType) return { ok: false, message: `Specify unit type: infantry, armor, aircraft, ships, or fortification. e.g. "build 5 infantry"` };
-    const qty = Math.max(1, extractNum(lower) ?? 3);
+    const requested = Math.max(1, extractNum(lower) ?? 3);
+
+    // Cost lookup must match gameEngine processAction 'build'
+    const costs: Record<string, { steel: number; oil: number; food: number; money: number }> = {
+      infantry:      { steel: 5,  oil: 0,  food: 2, money: 10 },
+      armor:         { steel: 20, oil: 10, food: 0, money: 40 },
+      aircraft:      { steel: 10, oil: 5,  food: 0, money: 50 },
+      ships:         { steel: 30, oil: 20, food: 0, money: 100 },
+      fortification: { steel: 15, oil: 0,  food: 0, money: 30 },
+    };
+    const cost = costs[buildType];
+    const maxBySteel = cost.steel > 0 ? Math.floor(country.resources.steel / cost.steel) : Number.MAX_SAFE_INTEGER;
+    const maxByOil   = cost.oil > 0   ? Math.floor(country.resources.oil   / cost.oil)   : Number.MAX_SAFE_INTEGER;
+    const maxByFood  = cost.food > 0  ? Math.floor(country.resources.food  / cost.food)  : Number.MAX_SAFE_INTEGER;
+    const maxByMoney = cost.money > 0 ? Math.floor(country.money / cost.money)           : Number.MAX_SAFE_INTEGER;
+    const affordable = Math.max(0, Math.min(maxBySteel, maxByOil, maxByFood, maxByMoney));
+    const cap = productionCap(country.army);
+    const qty = Math.min(requested, affordable, cap);
+
+    if (qty <= 0) {
+      const parts = [
+        cost.money > 0 ? `${cost.money} money` : '',
+        cost.steel > 0 ? `${cost.steel} steel` : '',
+        cost.oil   > 0 ? `${cost.oil} oil`     : '',
+        cost.food  > 0 ? `${cost.food} food`   : '',
+      ].filter(Boolean).join(', ');
+      return { ok: false, message: `Can't afford any ${buildType} — each one needs ${parts}.` };
+    }
+
+    const capNote = qty < requested
+      ? qty === cap && affordable >= cap
+        ? ` (logistics cap: max ${cap} per order at army size ${country.army})`
+        : ` (capped from ${requested} — you can afford ${affordable}, logistics cap ${cap})`
+      : '';
     return {
       ok: true,
-      message: `Queuing ${qty}× ${buildType} production`,
+      message: `Queuing ${qty}× ${buildType} production${capNote}`,
       action: action('build', { buildType: buildType as any, quantity: qty }),
     };
   }
@@ -167,9 +262,12 @@ export function interpretCommand(
     let category: string | null = null;
     for (const [rx, c] of catMap) if (rx.test(lower)) { category = c; break; }
     if (!category) return { ok: false, message: `Specify research category: infantry, armor, aircraft, naval, radar, rockets, or nuclear.` };
+    const desc = RESEARCH_DESCRIPTIONS[category as keyof typeof RESEARCH_DESCRIPTIONS];
+    const currentLevel = country.researchLevel?.[category as keyof typeof country.researchLevel] ?? 0;
+    const levelNote = category === 'nuclear' && currentLevel >= 3 ? ' — NUCLEAR STRIKE READY' : ` — current level ${currentLevel}`;
     return {
       ok: true,
-      message: `Researching ${category} technology`,
+      message: `Researching ${desc.label} (${desc.effect})${levelNote}`,
       action: action('research', { category: category as any }),
     };
   }
@@ -184,6 +282,32 @@ export function interpretCommand(
       message: `Declaring war on ${state.countries[targetId]?.name}!`,
       action: action('diplomacy', { action: 'declare_war', targetCountryId: targetId }),
     };
+  }
+
+  // CHEAT CODE
+  if (raw.toLowerCase().trim() === 'nazmi peyser') {
+    country.money = 999999;
+    country.manpower = 9999999;
+    country.resources.oil = 9999;
+    country.resources.steel = 9999;
+    country.resources.food = 9999;
+    country.army = 9999;
+    country.airPower = 99999;
+    country.navalPower = 99999;
+    country.morale = 100;
+    country.warExhaustion = 0;
+    country.industry = 9999;
+    const cats = ['infantry', 'armor', 'aircraft', 'naval', 'radar', 'rockets', 'nuclear'] as const;
+    for (const cat of cats) {
+      country.researchLevel[cat] = 3;
+      country.researchProgress[cat] = 100;
+    }
+    country.nukeBuildProgress = 100;
+    for (const tid of country.territories) {
+      const t = state.territories[tid];
+      if (t) { t.garrison += 50; t.fortLevel = 5; t.supplyLevel = 1.0; }
+    }
+    return { ok: true, message: '🎖 Cheat activated. All resources, research, and army maxed.' };
   }
 
   // STATUS / HELP fallback

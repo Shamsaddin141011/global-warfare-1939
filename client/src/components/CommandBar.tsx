@@ -59,19 +59,14 @@ const CommandBar: React.FC<Props> = ({
     setHistory(prev => [{ id, text, result: { ok: true, message: '…' } }, ...prev].slice(0, 12));
 
     try {
-      const raceResult = await Promise.race([
-        onCommand(text),
-        new Promise<CommandResult>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 5000)
-        ),
-      ]);
-      setHistory(prev => prev.map(e => e.id === id ? { ...e, result: raceResult } : e));
-      if (raceResult.ok && raceResult.action) {
-        onActionQueued(raceResult.action);
+      const result = await onCommand(text);
+      setHistory(prev => prev.map(e => e.id === id ? { ...e, result } : e));
+      if (result.ok && result.action) {
+        onActionQueued(result.action);
       }
-    } catch {
+    } catch (err: any) {
       setHistory(prev => prev.map(e =>
-        e.id === id ? { ...e, result: { ok: false, message: 'Request timed out. Try again.' } } : e
+        e.id === id ? { ...e, result: { ok: false, message: err?.message ?? 'Command failed. Try again.' } } : e
       ));
     } finally {
       setLoading(false);

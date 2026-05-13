@@ -13,19 +13,20 @@ export function tickEconomy(state: GameState): void {
       const supply = t.supplyLevel;
       industryGain += t.industryOutput * supply;
       manpowerGain += t.manpowerOutput * supply;
-      resourceGain.oil += (t.resourceOutput.oil ?? 0) * supply;
-      resourceGain.steel += (t.resourceOutput.steel ?? 0) * supply;
-      resourceGain.food += (t.resourceOutput.food ?? 0) * supply;
+      // Base +1 oil/steel/food per territory + any specialized output, all scaled by supply
+      resourceGain.oil   += ((t.resourceOutput.oil   ?? 0) + 1) * supply;
+      resourceGain.steel += ((t.resourceOutput.steel ?? 0) + 1) * supply;
+      resourceGain.food  += ((t.resourceOutput.food  ?? 0) + 1) * supply;
     }
 
     country.industry = Math.round(industryGain);
     country.manpower = Math.min(country.manpower + Math.round(manpowerGain), 9999999);
-    country.resources.oil = Math.max(0, country.resources.oil + Math.round(resourceGain.oil));
+    country.resources.oil   = Math.max(0, country.resources.oil   + Math.round(resourceGain.oil));
     country.resources.steel = Math.max(0, country.resources.steel + Math.round(resourceGain.steel));
-    country.resources.food = Math.max(0, country.resources.food + Math.round(resourceGain.food));
+    country.resources.food  = Math.max(0, country.resources.food  + Math.round(resourceGain.food));
 
-    // Money from industry
-    country.money += Math.round(country.industry * 0.5);
+    // Money: industry tax + flat per-territory base (every owned territory generates +5)
+    country.money += Math.round(country.industry * 0.5) + ownedTerritories.length * 5;
 
     // War exhaustion effect
     if (country.atWarWith.length > 0) {
@@ -40,15 +41,23 @@ export function tickEconomy(state: GameState): void {
     const rp = Math.round(country.industry * 0.1 + 5);
     country.researchPoints += rp;
 
+    // Nuke charging: auto-ticks 20%/turn once nuclear research hits lv3 (5 turns to arm)
+    if ((country.researchLevel?.nuclear ?? 0) >= 3) {
+      const progress = country.nukeBuildProgress ?? 0;
+      if (progress < 100) {
+        country.nukeBuildProgress = progress + 20;
+      }
+    }
+
     // Process production queue
-    tickProduction(country);
+    tickProduction(country, state);
   }
 
   // Update supply levels
   updateSupply(state);
 }
 
-function tickProduction(country: CountryStats): void {
+function tickProduction(country: CountryStats, state: GameState): void {
   const queue = country.productionQueue;
   if (queue.length === 0) return;
 
@@ -56,11 +65,32 @@ function tickProduction(country: CountryStats): void {
   item.turnsLeft -= 1;
 
   if (item.turnsLeft <= 0) {
+    // Resolve spawn territory: prefer the queued target; if lost, use capital; if that's lost too, fallback to any owned territory.
+    let target = item.targetTerritoryId ? state.territories[item.targetTerritoryId] : undefined;
+    if (!target || target.ownerId !== country.id) {
+      target = state.territories[country.capital];
+      if (!target || target.ownerId !== country.id) {
+        target = country.territories.map(id => state.territories[id]).find(t => t && t.ownerId === country.id);
+      }
+    }
+
     switch (item.type) {
-      case 'infantry': country.army += item.quantity * 2; break;
-      case 'armor': country.army += item.quantity; break;
+      case 'infantry': {
+        country.army += item.quantity;
+        if (target) target.garrison += item.quantity;
+        break;
+      }
+      case 'armor': {
+        country.army += item.quantity;
+        if (target) target.garrison += item.quantity;
+        break;
+      }
       case 'aircraft': country.airPower += item.quantity; break;
-      case 'ships': country.navalPower += item.quantity; break;
+      case 'ships':    country.navalPower += item.quantity; break;
+      case 'fortification': {
+        if (target) target.fortLevel = Math.min(5, target.fortLevel + item.quantity);
+        break;
+      }
     }
     queue.shift();
   }

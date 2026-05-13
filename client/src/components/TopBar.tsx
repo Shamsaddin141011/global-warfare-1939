@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Swords, Clock, CheckCircle, Circle } from 'lucide-react';
+import { Swords, Clock, CheckCircle, Circle, FastForward, Crosshair, MoveRight } from 'lucide-react';
 import { GameState, Lobby } from '@shared/types';
 import { MONTH_NAMES } from '../lib/mapColors';
+
+type MapMode = 'inspect' | 'attack' | 'move';
 
 interface Props {
   gameState: GameState | null;
@@ -11,12 +13,16 @@ interface Props {
   timerSeconds: number;
   pendingActionsCount: number;
   onEndTurn: () => void;
+  onForceEnd?: () => void;
+  mapMode?: MapMode;
+  onSetMode?: (m: MapMode) => void;
 }
 
-const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, pendingActionsCount, onEndTurn }) => {
+const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, pendingActionsCount, onEndTurn, onForceEnd, mapMode, onSetMode }) => {
   const myPlayer = myPlayerId && lobby ? lobby.players[myPlayerId] : null;
   const myCountry = myPlayer?.countryId && gameState ? gameState.countries[myPlayer.countryId] : null;
   const submitted = gameState?.submittedPlayers.includes(myPlayerId ?? '');
+  const isHost = !!myPlayer?.isHost;
 
   const urgent = timerSeconds <= 15;
   const month = gameState ? MONTH_NAMES[gameState.month] : '';
@@ -86,6 +92,37 @@ const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, p
 
         {/* Timer + End Turn + My Country */}
         <div className="flex items-center gap-3">
+          {gameState?.phase === 'planning' && onSetMode && (
+            <div className="flex items-center gap-1.5">
+              <motion.button
+                onClick={() => onSetMode('attack')}
+                whileTap={{ scale: 0.95 }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-semibold text-xs border transition-all ${
+                  mapMode === 'attack'
+                    ? 'bg-red-700 border-red-500 text-white animate-pulse'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-red-700 hover:text-red-300'
+                }`}
+                title="Click-to-attack: pick your territory then click an enemy"
+              >
+                <Crosshair size={12} />
+                {mapMode === 'attack' ? 'Attack ON' : 'Attack'}
+              </motion.button>
+              <motion.button
+                onClick={() => onSetMode('move')}
+                whileTap={{ scale: 0.95 }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-semibold text-xs border transition-all ${
+                  mapMode === 'move'
+                    ? 'bg-blue-700 border-blue-500 text-white animate-pulse'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-700 hover:text-blue-300'
+                }`}
+                title="Click-to-move: pick your territory then click another of your territories"
+              >
+                <MoveRight size={12} />
+                {mapMode === 'move' ? 'Move ON' : 'Move'}
+              </motion.button>
+            </div>
+          )}
+
           {gameState?.phase === 'planning' && (
             <>
               <div className={`flex items-center gap-1 font-mono text-lg font-bold ${urgent ? 'timer-urgent' : 'text-gray-200'}`}>
@@ -106,6 +143,18 @@ const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, p
                 <CheckCircle size={14} />
                 {submitted ? 'Submitted' : `End Turn${pendingActionsCount > 0 ? ` (${pendingActionsCount})` : ''}`}
               </motion.button>
+
+              {isHost && onForceEnd && (
+                <motion.button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded font-semibold text-xs border bg-red-900 border-red-700 text-red-200 hover:bg-red-800 cursor-pointer"
+                  onClick={onForceEnd}
+                  whileTap={{ scale: 0.97 }}
+                  title="Force-resolve turn now for all players (host only)"
+                >
+                  <FastForward size={12} />
+                  Resolve All
+                </motion.button>
+              )}
             </>
           )}
 

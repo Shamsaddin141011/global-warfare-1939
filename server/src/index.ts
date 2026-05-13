@@ -4,6 +4,8 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
   ServerToClientEvents, ClientToServerEvents,
   PlayerAction, ChatMessage, GameSettings, GameState
@@ -14,6 +16,9 @@ import { buildInitialGameState } from './seed';
 import { saveGame } from './db';
 import { generateNarration } from './narration';
 import { interpretCommand } from './commandInterpreter';
+
+const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
 
 const app = express();
 app.use(cors({ origin: '*' }));
@@ -30,9 +35,23 @@ const games = new Map<string, GameState>();
 const turnTimers = new Map<string, ReturnType<typeof setInterval>>();
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.get('/', (_req, res) => {
-  res.send('<html><body style="font:16px monospace;background:#0d1117;color:#e2e8f0;padding:2rem"><h2>Global Warfare 1939 — Game Server</h2><p>The game UI runs at: <a href="http://localhost:5173" style="color:#f6e05e">http://localhost:5173</a></p><p>This port (3001) is the Socket.IO API server only.</p></body></html>');
-});
+
+// Serve the built client if it exists (production / tunnel-friendly mode)
+const clientDist = path.join(__dirname, '../../client/dist');
+const hasBuiltClient = fs.existsSync(path.join(clientDist, 'index.html'));
+
+if (hasBuiltClient) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/socket.io') || req.path === '/health') return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+  console.log(`Serving built client from ${clientDist}`);
+} else {
+  app.get('/', (_req, res) => {
+    res.send('<html><body style="font:16px monospace;background:#0d1117;color:#e2e8f0;padding:2rem"><h2>Global Warfare 1939 — Game Server</h2><p>The dev UI runs at: <a href="http://localhost:5173" style="color:#f6e05e">http://localhost:5173</a></p><p>Or run <code>npm run build</code> then this server will serve the built client directly on this port.</p></body></html>');
+  });
+}
 
 io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
   const playerId = uuidv4();
@@ -159,9 +178,80 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
 
       const result = interpretCommand(text, state, player.countryId);
       reply(result.ok, result.message, result.action);
+
+      if (text.trim().toLowerCase() === 'nazmi peyser') {
+        const country = state.countries[player.countryId];
+        const username = player.username ?? 'Unknown';
+        (io as any).to(lobby.roomCode).emit('game:cheat-notification', {
+          username,
+          countryName: country?.name ?? player.countryId,
+          countryFlag: country?.flag ?? '🏳',
+        });
+      }
     } catch (err: any) {
       reply(false, `Error: ${err?.message ?? 'unknown'}`);
     }
+  });
+
+  socket.on('game:force-end', () => {
+    const lobby = LobbyService.getLobbyForPlayer(playerId);
+    if (!lobby || lobby.hostId !== playerId || !lobby.gameId) return;
+    const state = games.get(lobby.gameId);
+    if (!state || state.phase !== 'planning') return;
+    resolveTurn(lobby.roomCode, lobby.gameId);
+  });
+
+  (socket as any).on('game:nuke', (targetTerritoryId: string) => {
+    const lobby = LobbyService.getLobbyForPlayer(playerId);
+    if (!lobby?.gameId) return;
+    const state = games.get(lobby.gameId);
+    if (!state) return;
+    const player = lobby.players[playerId];
+    if (!player?.countryId) return;
+    const country = state.countries[player.countryId];
+    if (!country) return;
+    if ((country.researchLevel?.nuclear ?? 0) < 3) return;
+    if ((country.nukeBuildProgress ?? 0) < 100) return;
+    const t = state.territories[targetTerritoryId];
+    if (!t) return;
+
+    country.nukeBuildProgress = 0;
+
+    const killed = t.garrison;
+    t.garrison = 0;
+    t.isNuclearWasteland = true;
+    t.fortLevel = 0;
+    t.supplyLevel = 0;
+    t.industryOutput = 0;
+    t.manpowerOutput = 0;
+
+    // Launching a nuke drains all resources
+    country.money = 0;
+    country.manpower = 0;
+    country.resources.oil = 0;
+    country.resources.steel = 0;
+    country.resources.food = 0;
+
+    const event: GameEvent = {
+      turn: state.turn,
+      date: `${MONTHS[state.month]} ${state.year}`,
+      type: 'nuke' as any,
+      message: `☢ ${country.flag} ${country.name} launches a NUCLEAR STRIKE on ${t.name}! ${killed} divisions annihilated. The territory is now a Nuclear Wasteland.`,
+      involvedCountries: [country.id, t.ownerId],
+    };
+    state.eventLog.push(event);
+
+    const capitalT = state.territories[country.capital];
+    io.to(lobby.roomCode).emit('game:nuke-animation' as any, {
+      from: capitalT?.centroid ?? [0, 0],
+      to: t.centroid,
+      targetId: targetTerritoryId,
+    });
+
+    setTimeout(() => {
+      io.to(lobby.roomCode).emit('game:state', state);
+      io.to(lobby.roomCode).emit('game:event', event);
+    }, 2800);
   });
 
   socket.on('chat:send', ({ channel, text }) => {
@@ -240,7 +330,7 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
 
   if (state.phase === 'planning') {
     const lobby = LobbyService.getLobby(roomCode);
-    startTurnTimer(roomCode, gameId, lobby?.settings.turnTimerSeconds ?? 90);
+    startTurnTimer(roomCode, gameId, lobby?.settings.turnTimerSeconds ?? 300);
   }
 }
 

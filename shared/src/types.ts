@@ -2,7 +2,7 @@ export type Terrain = 'plains' | 'forest' | 'mountain' | 'desert' | 'urban' | 'c
 export type FactionType = 'axis' | 'allies' | 'neutral';
 export type AIPersonality = 'aggressive' | 'defensive' | 'opportunist' | 'isolationist';
 export type TurnMode = 'simultaneous' | 'sequential';
-export type ActionType = 'move' | 'reinforce' | 'build' | 'research' | 'diplomacy' | 'espionage';
+export type ActionType = 'move' | 'reinforce' | 'build' | 'research' | 'diplomacy' | 'espionage' | 'nuke';
 export type ResearchCategory = 'infantry' | 'armor' | 'aircraft' | 'naval' | 'radar' | 'rockets' | 'nuclear';
 export type BuildType = 'infantry' | 'armor' | 'aircraft' | 'ships' | 'fortification';
 export type DiplomacyAction = 'propose_alliance' | 'declare_war' | 'propose_peace' | 'embargo' | 'trade';
@@ -20,6 +20,7 @@ export interface ProductionItem {
   type: BuildType;
   quantity: number;
   turnsLeft: number;
+  targetTerritoryId?: string;
 }
 
 export interface CountryStats {
@@ -44,7 +45,9 @@ export interface CountryStats {
   researchPoints: number;
   warExhaustion: number;
   researchProgress: Record<ResearchCategory, number>;
+  researchLevel: Record<ResearchCategory, number>;
   productionQueue: ProductionItem[];
+  nukeBuildProgress?: number; // 0–100, charges when nuclear research >= 3
 
   atWarWith: string[];
   alliedWith: string[];
@@ -61,6 +64,7 @@ export interface TerritoryState {
   originalOwnerId: string;
   terrain: Terrain;
   adjacentTo: string[];
+  navalAdjacentTo?: string[];
   isCoastal: boolean;
   industryOutput: number;
   manpowerOutput: number;
@@ -70,6 +74,7 @@ export interface TerritoryState {
   supplyLevel: number;
   geoId: string;
   centroid: [number, number];
+  isNuclearWasteland?: boolean;
 }
 
 export interface MoveAction {
@@ -132,7 +137,7 @@ export interface CombatResult {
 export interface GameEvent {
   turn: number;
   date: string;
-  type: 'combat' | 'diplomacy' | 'research' | 'production' | 'ai' | 'narration';
+  type: 'combat' | 'diplomacy' | 'research' | 'production' | 'ai' | 'narration' | 'nuke';
   message: string;
   involvedCountries: string[];
 }
@@ -220,6 +225,7 @@ export interface ClientToServerEvents {
   'lobby:solo': (username: string, callback: (lobby: Lobby) => void) => void;
   'game:submit-actions': (actions: PlayerAction[]) => void;
   'game:command': (payload: { reqId: string; text: string }) => void;
+  'game:force-end': () => void;
   'chat:send': (msg: { channel: string; text: string }) => void;
 }
 

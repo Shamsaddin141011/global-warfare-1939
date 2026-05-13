@@ -1,8 +1,16 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo, useEffect, useRef } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker, Line } from 'react-simple-maps';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameState, TerritoryState, PlayerAction, MoveAction } from '@shared/types';
 import { COUNTRY_COLORS } from '@shared/constants';
+import { WILDERNESS_REGIONS } from '@shared/wildernessData';
+import { formatManpower } from '../lib/mapColors';
+import { Delaunay } from 'd3-delaunay';
+import { geoMercator, geoPath } from 'd3-geo';
+
+const MAJOR_COUNTRIES = ['germany', 'ussr', 'france', 'uk', 'italy', 'japan', 'usa', 'china'] as const;
+const MAP_PROJECTION = geoMercator().scale(160).translate([400, 300]);
+const MAP_PATH_GEN = geoPath(MAP_PROJECTION as any);
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -14,6 +22,21 @@ const ISO_TO_TERRITORY: Record<string, string> = {
   '348': 'hungary', '642': 'romania', '100': 'bulgaria',
   '688': 'yugoslavia', '300': 'greece', '8': 'albania', '792': 'turkey',
   '703': 'slovakia', '643': 'ussr',
+  // Soviet republics — in 1939 these were all USSR territory
+  '398': 'ussr', // Kazakhstan (Kazakh SSR)
+  '804': 'ussr', // Ukraine (Ukrainian SSR)
+  '112': 'ussr', // Belarus (Byelorussian SSR)
+  '233': 'ussr', // Estonia (annexed 1940)
+  '428': 'ussr', // Latvia (annexed 1940)
+  '440': 'ussr', // Lithuania (annexed 1940)
+  '498': 'ussr', // Moldova (Moldavian SSR)
+  '268': 'ussr', // Georgia (Georgian SSR)
+  '51':  'ussr', // Armenia (Armenian SSR)
+  '31':  'ussr', // Azerbaijan (Azerbaijan SSR)
+  '762': 'ussr', // Tajikistan (Tajik SSR)
+  '795': 'ussr', // Turkmenistan (Turkmen SSR)
+  '860': 'ussr', // Uzbekistan (Uzbek SSR)
+  '417': 'ussr', // Kyrgyzstan (Kirghiz SSR)
   '392': 'japan', '410': 'korea', '408': 'manchuria',
   '158': 'china-north', '156': 'china',
   '496': 'mongolia', '764': 'thailand', '704': 'vietnam',
@@ -28,10 +51,26 @@ const ISO_TO_TERRITORY: Record<string, string> = {
   '24': 'angola', '508': 'mozambique', '450': 'madagascar',
   '840': 'usa', '124': 'canada', '76': 'brazil', '484': 'mexico', '32': 'argentina',
   '36': 'australia', '554': 'new-zealand', '598': 'new-guinea',
+  // Wilderness — unaligned ghostland territories
+  '352': 'iceland', '372': 'ireland', '304': 'greenland',
+  '192': 'cuba', '170': 'colombia', '862': 'venezuela',
+  '604': 'peru', '152': 'chile', '68': 'bolivia',
+  '600': 'paraguay', '858': 'uruguay', '218': 'ecuador',
+  '887': 'yemen', '512': 'oman', '4': 'afghanistan',
+  '144': 'sri-lanka', '116': 'cambodia', '418': 'laos',
+  '834': 'tanzania', '800': 'uganda', '894': 'zambia',
+  '716': 'zimbabwe', '72': 'botswana', '516': 'namibia',
+  '376': 'palestine',
 };
+
+// Auto-extend with every WILDERNESS_REGIONS entry (Africa fillers, Caribbean, etc.)
+for (const r of WILDERNESS_REGIONS) {
+  if (!(r.iso in ISO_TO_TERRITORY)) ISO_TO_TERRITORY[r.iso] = r.id;
+}
 
 const UNKNOWN_FILL = '#1e2d3d';
 const OCEAN_FILL = '#0d1a2e';
+const WASTELAND_FILL = '#00ff44';
 
 function lighten(hex: string, amount: number): string {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -53,6 +92,9 @@ function getTerritoryColor(
   const territoryId = ISO_TO_TERRITORY[isoId];
   if (!territoryId) return { fill: UNKNOWN_FILL, stroke: '#0d1117', strokeWidth: 0.3 };
 
+  const territory = gameState?.territories[territoryId];
+  if (territory?.isNuclearWasteland) return { fill: WASTELAND_FILL, stroke: '#00cc33', strokeWidth: 1 };
+
   if (territoryId === targetId)
     return { fill: '#7a1a1a', stroke: '#ff5050', strokeWidth: 2 };
   if (territoryId === selectedId)
@@ -73,7 +115,6 @@ function getTerritoryColor(
   }
 
   if (!gameState) return { fill: '#2a3a4a', stroke: '#0d1117', strokeWidth: 0.3 };
-  const territory = gameState.territories[territoryId];
   if (!territory) return { fill: UNKNOWN_FILL, stroke: '#0d1117', strokeWidth: 0.3 };
 
   return {
@@ -81,6 +122,12 @@ function getTerritoryColor(
     stroke: '#0a0f18',
     strokeWidth: 0.4,
   };
+}
+
+interface NukeAnimation {
+  from: [number, number];
+  to: [number, number];
+  targetId: string;
 }
 
 interface Props {
@@ -94,6 +141,12 @@ interface Props {
   onZoomChange: (z: number) => void;
   onCenterChange: (c: [number, number]) => void;
   onTerritoryClick: (id: string) => void;
+  nukingMode: boolean;
+  nukeUnlocked: boolean;
+  nukeReady: boolean;
+  nukeBuildProgress: number;
+  nukeAnimation: NukeAnimation | null;
+  onNukeButtonClick: () => void;
 }
 
 interface TooltipState {
@@ -107,9 +160,27 @@ interface TooltipState {
 const WorldMap: React.FC<Props> = ({
   gameState, selectedTerritoryId, targetTerritoryId, pendingActions,
   myCountryId, zoom, center, onZoomChange, onCenterChange, onTerritoryClick,
+  nukingMode, nukeUnlocked, nukeReady, nukeBuildProgress, nukeAnimation, onNukeButtonClick,
 }) => {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [nukeMousePos, setNukeMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [nukeProgress, setNukeProgress] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!nukeAnimation) { setNukeProgress(0); return; }
+    const duration = 2800;
+    let start: number | null = null;
+    function animate(ts: number) {
+      if (!start) start = ts;
+      const p = Math.min(1, (ts - start) / duration);
+      setNukeProgress(p);
+      if (p < 1) rafRef.current = requestAnimationFrame(animate);
+    }
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [nukeAnimation]);
 
   const handleClick = useCallback((territoryId: string) => {
     onTerritoryClick(territoryId);
@@ -131,6 +202,56 @@ const WorldMap: React.FC<Props> = ({
     return { adjacentEnemy: enemy, adjacentFriendly: friendly };
   }, [selectedTerritoryId, gameState, myCountryId]);
 
+  // Compute Voronoi cells per major country so each province visually owns a section
+  const voronoiByCountry = useMemo(() => {
+    if (!gameState) return [] as Array<{
+      countryId: string;
+      mixed: boolean;
+      cells: { provinceId: string; ownerId: string; pathD: string }[];
+    }>;
+    const out: Array<{
+      countryId: string;
+      mixed: boolean;
+      cells: { provinceId: string; ownerId: string; pathD: string }[];
+    }> = [];
+
+    for (const major of MAJOR_COUNTRIES) {
+      const provinces = Object.values(gameState.territories).filter(
+        t => t.originalOwnerId === major
+      );
+      if (provinces.length < 2) continue;
+
+      const points: [number, number][] = provinces
+        .map(p => MAP_PROJECTION(p.centroid))
+        .map(p => (p ? [p[0], p[1]] as [number, number] : [0, 0] as [number, number]));
+
+      const xs = points.map(p => p[0]);
+      const ys = points.map(p => p[1]);
+      const pad = 400;
+      const bbox: [number, number, number, number] = [
+        Math.min(...xs) - pad, Math.min(...ys) - pad,
+        Math.max(...xs) + pad, Math.max(...ys) + pad,
+      ];
+
+      const delaunay = Delaunay.from(points);
+      const voronoi = delaunay.voronoi(bbox);
+      const cells: { provinceId: string; ownerId: string; pathD: string }[] = [];
+      for (let i = 0; i < provinces.length; i++) {
+        const poly = voronoi.cellPolygon(i);
+        if (!poly) continue;
+        const d = 'M ' + poly.map((pt: number[]) => `${pt[0]},${pt[1]}`).join(' L ') + ' Z';
+        cells.push({
+          provinceId: provinces[i].id,
+          ownerId: provinces[i].ownerId,
+          pathD: d,
+        });
+      }
+      const owners = new Set(cells.map(c => c.ownerId));
+      out.push({ countryId: major, mixed: owners.size > 1, cells });
+    }
+    return out;
+  }, [gameState]);
+
   // Build attack arrows from pending move actions
   const attackArrows = pendingActions
     .filter(a => a.type === 'move')
@@ -145,8 +266,48 @@ const WorldMap: React.FC<Props> = ({
 
   const showMarkers = zoom >= 2;
 
+  // Only label major-power territories (capitals + sub-provinces), filtered by screen-space collision
+  const visibleLabelIds = useMemo(() => {
+    if (!gameState || zoom < 4) return new Set<string>();
+    const territories = Object.values(gameState.territories).filter(
+      t => t.centroid && (MAJOR_COUNTRIES as readonly string[]).includes(t.originalOwnerId)
+    );
+    // Capitals first so they always win collision ties
+    const sorted = [...territories].sort((a, b) => {
+      const aCapital = gameState.countries[a.originalOwnerId]?.capital === a.id ? 1 : 0;
+      const bCapital = gameState.countries[b.originalOwnerId]?.capital === b.id ? 1 : 0;
+      return bCapital - aCapital;
+    });
+    const minScreenDist = 45;
+    const placed: Array<[number, number]> = [];
+    const visible = new Set<string>();
+    for (const t of sorted) {
+      const proj = MAP_PROJECTION(t.centroid!);
+      if (!proj) continue;
+      const sx = proj[0] * zoom;
+      const sy = proj[1] * zoom;
+      const clash = placed.some(([ox, oy]) => Math.hypot(sx - ox, sy - oy) < minScreenDist);
+      if (!clash) {
+        placed.push([sx, sy]);
+        visible.add(t.id);
+      }
+    }
+    return visible;
+  }, [gameState, zoom]);
+
+  const bombCoords: [number, number] | null = nukeAnimation
+    ? [
+        nukeAnimation.from[0] + (nukeAnimation.to[0] - nukeAnimation.from[0]) * nukeProgress,
+        nukeAnimation.from[1] + (nukeAnimation.to[1] - nukeAnimation.from[1]) * nukeProgress,
+      ]
+    : null;
+
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: OCEAN_FILL, overflow: 'hidden' }}>
+    <div
+      style={{ position: 'relative', width: '100%', height: '100%', background: OCEAN_FILL, overflow: 'hidden', cursor: nukingMode ? 'crosshair' : 'default' }}
+      onMouseMove={nukingMode ? (e) => setNukeMousePos({ x: e.clientX, y: e.clientY }) : undefined}
+      onMouseLeave={nukingMode ? () => setNukeMousePos(null) : undefined}
+    >
       <style>{`
         @keyframes dashFlow {
           from { stroke-dashoffset: 20; }
@@ -164,6 +325,14 @@ const WorldMap: React.FC<Props> = ({
           50% { opacity: 0.6; }
         }
         .adjacent-enemy { animation: adjacentPulse 1.2s ease-in-out infinite; }
+        @keyframes nukeCursor {
+          0%, 100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+          50% { transform: translate(-50%,-50%) scale(1.15); opacity: 0.75; }
+        }
+        @keyframes nukeGlow {
+          0%, 100% { box-shadow: 0 0 12px 4px rgba(255,80,0,0.7); }
+          50% { box-shadow: 0 0 24px 8px rgba(255,200,0,0.9); }
+        }
       `}</style>
 
       <ComposableMap
@@ -176,14 +345,40 @@ const WorldMap: React.FC<Props> = ({
           center={center}
           minZoom={0.8}
           maxZoom={12}
-          onMoveEnd={({ zoom: z, coordinates }) => {
+          onMoveEnd={({ zoom: z, coordinates }: { zoom: number; coordinates: [number, number] }) => {
             onZoomChange(z);
             onCenterChange(coordinates as [number, number]);
           }}
         >
           <Geographies geography={GEO_URL}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
+            {({ geographies }: { geographies: any[] }) => {
+              // Map each major-country territory id → ALL its geography polygons (for clipPath union)
+              // USSR spans many ISO codes (Russia + Kazakhstan + Ukraine + Baltics + Caucasus + ...)
+              const majorGeos: Record<string, any[]> = {};
+              for (const geo of geographies) {
+                const tid = ISO_TO_TERRITORY[String(geo.id)];
+                if (tid && (MAJOR_COUNTRIES as readonly string[]).includes(tid)) {
+                  if (!majorGeos[tid]) majorGeos[tid] = [];
+                  majorGeos[tid].push(geo);
+                }
+              }
+
+              return (
+                <>
+                  {/* ClipPaths for major countries — UNION of every polygon mapped to the major */}
+                  <defs>
+                    {Object.entries(majorGeos).map(([m, geos]) => (
+                      <clipPath key={`clip-${m}`} id={`voronoi-clip-${m}`} clipPathUnits="userSpaceOnUse">
+                        {geos.map((geo, i) => {
+                          const d = MAP_PATH_GEN(geo);
+                          if (!d) return null;
+                          return <path key={i} d={d} />;
+                        })}
+                      </clipPath>
+                    ))}
+                  </defs>
+
+                  {geographies.map((geo: any) => {
                 const isoId = String(geo.id);
                 const territoryId = ISO_TO_TERRITORY[isoId];
                 const { fill, stroke, strokeWidth } = getTerritoryColor(
@@ -224,8 +419,57 @@ const WorldMap: React.FC<Props> = ({
                     onMouseLeave={() => { setHoveredId(null); setTooltip(null); }}
                   />
                 );
-              })
-            }
+              })}
+
+                  {/* Voronoi province-section overlay — each cell clickable */}
+                  {voronoiByCountry.map(v => (
+                    <g key={`vor-${v.countryId}`} clipPath={`url(#voronoi-clip-${v.countryId})`}>
+                      {v.cells.map(c => {
+                        const territory = gameState?.territories[c.provinceId];
+                        const owner = territory ? gameState?.countries[territory.ownerId] : undefined;
+                        const isSelected = c.provinceId === selectedTerritoryId;
+                        const isTarget = c.provinceId === targetTerritoryId;
+                        const isHover = c.provinceId === hoveredId;
+                        return (
+                          <path
+                            key={c.provinceId}
+                            d={c.pathD}
+                            fill={gameState?.territories[c.provinceId]?.isNuclearWasteland ? WASTELAND_FILL : (COUNTRY_COLORS[c.ownerId] ?? '#5a5a5a')}
+                            fillOpacity={
+                              isSelected ? 0.95 :
+                              isTarget   ? 0.95 :
+                              isHover    ? 0.85 :
+                              v.mixed    ? 0.80 : 0.55
+                            }
+                            stroke={isSelected ? '#f0e080' : isTarget ? '#ff5050' : '#000'}
+                            strokeWidth={isSelected || isTarget ? 2.5 : 1.5}
+                            strokeOpacity={0.85}
+                            vectorEffect="non-scaling-stroke"
+                            style={{ cursor: 'pointer', transition: 'fill-opacity 0.12s ease' }}
+                            onClick={(e) => { e.stopPropagation(); handleClick(c.provinceId); }}
+                            onMouseEnter={(evt: React.MouseEvent) => {
+                              setHoveredId(c.provinceId);
+                              if (territory) {
+                                setTooltip({
+                                  territory,
+                                  ownerName: owner?.name ?? territory.ownerId,
+                                  ownerColor: owner?.color ?? '#aaa',
+                                  x: evt.clientX, y: evt.clientY,
+                                });
+                              }
+                            }}
+                            onMouseMove={(evt: React.MouseEvent) => {
+                              setTooltip(t => t ? { ...t, x: evt.clientX, y: evt.clientY } : null);
+                            }}
+                            onMouseLeave={() => { setHoveredId(null); setTooltip(null); }}
+                          />
+                        );
+                      })}
+                    </g>
+                  ))}
+                </>
+              );
+            }}
           </Geographies>
 
           {/* Attack / move arrows */}
@@ -258,6 +502,30 @@ const WorldMap: React.FC<Props> = ({
             </React.Fragment>
           ))}
 
+          {/* Nuke flight path */}
+          {nukeAnimation && (
+            <>
+              <Line
+                from={nukeAnimation.from}
+                to={nukeAnimation.to}
+                stroke="#ff4400"
+                strokeWidth={2 / zoom}
+                style={{ strokeDasharray: `${8 / zoom} ${4 / zoom}`, pointerEvents: 'none', opacity: 0.8 }}
+              />
+              {bombCoords && (
+                <Marker coordinates={bombCoords}>
+                  <text textAnchor="middle" style={{ fontSize: 18 / zoom, pointerEvents: 'none', userSelect: 'none' }}>☢</text>
+                </Marker>
+              )}
+              {nukeProgress >= 0.98 && (
+                <Marker coordinates={nukeAnimation.to}>
+                  <circle r={30 / zoom} fill="#00ff44" fillOpacity={0.4} stroke="#00ff44" strokeWidth={2 / zoom} style={{ pointerEvents: 'none' }} />
+                  <text textAnchor="middle" style={{ fontSize: 22 / zoom, pointerEvents: 'none' }}>💥</text>
+                </Marker>
+              )}
+            </>
+          )}
+
           {/* Garrison markers */}
           {showMarkers && gameState && Object.values(gameState.territories).map(territory => {
             if (!territory.centroid) return null;
@@ -266,6 +534,7 @@ const WorldMap: React.FC<Props> = ({
             const isAdjEnemy = adjacentEnemy.has(territory.id);
             const owner = gameState.countries[territory.ownerId];
             const isCapital = owner?.capital === territory.id;
+            const isStarved = owner && owner.resources.oil <= 0 && owner.resources.steel <= 0 && owner.resources.food <= 0;
             const markerSize = Math.max(3, 6 / zoom);
             const fontSize = Math.max(4, 7 / zoom);
 
@@ -275,6 +544,11 @@ const WorldMap: React.FC<Props> = ({
                   <text textAnchor="middle" y={-markerSize - 2} style={{
                     fontSize: fontSize * 1.2, fill: '#fbbf24', pointerEvents: 'none', fontFamily: 'serif',
                   }} className="capital-marker">★</text>
+                )}
+                {isStarved && territory.garrison > 0 && (
+                  <text textAnchor="middle" y={-markerSize - fontSize - 2} style={{
+                    fontSize: fontSize * 1.1, pointerEvents: 'none',
+                  }}>⚠️</text>
                 )}
                 {/* Attack indicator for adjacent enemy */}
                 {isAdjEnemy && !targetTerritoryId && (
@@ -296,10 +570,13 @@ const WorldMap: React.FC<Props> = ({
                     }}>{territory.garrison}</text>
                   </>
                 )}
-                {zoom >= 4 && (
+                {visibleLabelIds.has(territory.id) && (
                   <text textAnchor="middle" y={markerSize + fontSize + 1} style={{
-                    fontSize: fontSize * 0.85, fill: 'rgba(255,255,255,0.7)',
+                    fontSize: fontSize * 0.7, fill: 'rgba(255,255,255,0.9)',
+                    stroke: 'rgba(0,0,0,0.9)', strokeWidth: `${1.8 / zoom}`,
+                    paintOrder: 'stroke',
                     pointerEvents: 'none', fontFamily: 'Georgia, serif',
+                    letterSpacing: '0.03em',
                   }}>{territory.name}</text>
                 )}
               </Marker>
@@ -332,6 +609,81 @@ const WorldMap: React.FC<Props> = ({
         )}
       </AnimatePresence>
 
+      {/* Nuke button */}
+      <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 190 }}>
+        {!nukeUnlocked ? (
+          <div style={{ background: 'rgba(20,20,20,0.88)', border: '1px solid #444', borderRadius: 6, padding: '8px 12px', color: '#555', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            🔒 Nuclear Lv.3 Required
+          </div>
+        ) : !nukeReady ? (
+          <div style={{ background: 'rgba(10,20,10,0.92)', border: '1px solid #336633', borderRadius: 6, padding: '8px 12px', width: 190 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#66ff88', marginBottom: 5 }}>
+              ☢ Arming Warhead… {nukeBuildProgress}%
+            </div>
+            <div style={{ height: 8, background: '#0a1a0a', borderRadius: 4, overflow: 'hidden', border: '1px solid #224422' }}>
+              <div style={{
+                height: '100%', width: `${nukeBuildProgress}%`,
+                background: 'linear-gradient(90deg, #00cc33, #00ff44)',
+                borderRadius: 4,
+                boxShadow: '0 0 6px #00ff44',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+            <div style={{ fontSize: 9, color: '#446644', marginTop: 4 }}>
+              Arming automatically · launches drains all resources
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={onNukeButtonClick}
+            style={{
+              padding: '8px 14px',
+              width: 190,
+              background: nukingMode ? '#993300' : 'linear-gradient(135deg,#8b0000,#cc2200)',
+              border: '2px solid #ff4400',
+              borderRadius: 6,
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+              animation: !nukingMode ? 'nukeGlow 2s ease-in-out infinite' : 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {nukingMode ? '✕ Cancel Strike' : '☢ NUCLEAR STRIKE'}
+          </button>
+        )}
+        {nukingMode && (
+          <div style={{ background: 'rgba(180,0,0,0.9)', border: '1px solid #ff4400', borderRadius: 4, padding: '4px 8px', fontSize: 11, color: '#ffcccc', width: 190, textAlign: 'center' }}>
+            Click any territory to launch
+          </div>
+        )}
+      </div>
+
+      {/* Nuke targeting cursor */}
+      {nukingMode && nukeMousePos && (
+        <div style={{
+          position: 'fixed',
+          left: nukeMousePos.x,
+          top: nukeMousePos.y,
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          border: '3px solid #ff4400',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          animation: 'nukeCursor 1s ease-in-out infinite',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>☢</span>
+          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(255,68,0,0.6)', transform: 'translateY(-50%)' }} />
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(255,68,0,0.6)', transform: 'translateX(-50%)' }} />
+        </div>
+      )}
+
       {/* Zoom controls */}
       <div style={{ position: 'absolute', bottom: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {[
@@ -347,6 +699,38 @@ const WorldMap: React.FC<Props> = ({
           }}>{btn.label}</button>
         ))}
       </div>
+
+      {/* Production legend */}
+      {gameState && myCountryId && gameState.countries[myCountryId]?.productionQueue?.length > 0 && (
+        <div style={{
+          position: 'absolute', bottom: 16, left: 180,
+          background: 'rgba(3,7,18,0.92)', border: '1px solid #92400e',
+          borderRadius: 6, padding: '8px 10px', fontSize: 11, maxWidth: 280,
+        }}>
+          <div style={{ color: '#fcd34d', fontWeight: 600, marginBottom: 4 }}>
+            🏭 In Production ({gameState.countries[myCountryId].productionQueue.length})
+          </div>
+          {gameState.countries[myCountryId].productionQueue.map((item, i) => {
+            const spawnT = item.targetTerritoryId ? gameState.territories[item.targetTerritoryId] : undefined;
+            const spawnName = spawnT?.name ?? gameState.territories[gameState.countries[myCountryId].capital]?.name ?? 'capital';
+            const typeIcon: Record<string, string> = {
+              infantry: '⚔️', armor: '🛡️', aircraft: '✈️', ships: '🚢', fortification: '🏰',
+            };
+            const turnsLabel = item.turnsLeft <= 0 ? 'next turn' : `${item.turnsLeft}t left`;
+            const isLanded = item.type === 'aircraft' || item.type === 'ships';
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ width: 14 }}>{typeIcon[item.type] ?? '•'}</span>
+                <span style={{ color: '#e5e7eb' }}>×{item.quantity} {item.type}</span>
+                <span style={{ color: '#9ca3af', fontSize: 10 }}>
+                  → {isLanded ? (item.type === 'aircraft' ? 'air pool' : 'fleet pool') : spawnName}
+                </span>
+                <span style={{ color: '#fbbf24', marginLeft: 'auto', fontSize: 10 }}>{turnsLabel}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Legend */}
       <div style={{
@@ -405,7 +789,10 @@ const TerritoryTooltip: React.FC<{
     boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
     minWidth: 200, fontFamily: 'Georgia, serif',
   }}>
-    <div style={{ color: '#fcd34d', fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{territory.name}</div>
+    <div style={{ color: territory.isNuclearWasteland ? '#00ff44' : '#fcd34d', fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
+      {territory.isNuclearWasteland ? '☢ ' : ''}{territory.name}
+      {territory.isNuclearWasteland && <span style={{ fontSize: 10, marginLeft: 6, color: '#66ff88' }}>Nuclear Wasteland</span>}
+    </div>
     <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 8 }}>
       <span style={{ color: ownerColor }}>●</span> {ownerName} · {territory.terrain.charAt(0).toUpperCase() + territory.terrain.slice(1)}
     </div>
@@ -414,7 +801,7 @@ const TerritoryTooltip: React.FC<{
         { label: 'Garrison', value: `${territory.garrison} div.`, color: '#f9fafb' },
         { label: 'Fort', value: '★'.repeat(territory.fortLevel) + '☆'.repeat(5 - territory.fortLevel), color: '#fbbf24' },
         { label: 'Industry', value: String(territory.industryOutput), color: '#60a5fa' },
-        { label: 'Manpower', value: `${territory.manpowerOutput.toLocaleString()}k`, color: '#4ade80' },
+        { label: 'Manpower', value: formatManpower(territory.manpowerOutput), color: '#4ade80' },
         { label: 'Supply', value: `${Math.round(territory.supplyLevel * 100)}%`, color: territory.supplyLevel > 0.7 ? '#4ade80' : '#facc15' },
         ...(territory.resourceOutput.oil ? [{ label: 'Oil', value: String(territory.resourceOutput.oil), color: '#fb923c' }] : []),
         ...(territory.resourceOutput.steel ? [{ label: 'Steel', value: String(territory.resourceOutput.steel), color: '#d1d5db' }] : []),

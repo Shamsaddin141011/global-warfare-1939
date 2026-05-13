@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flag, Map, Globe, FlaskConical, Factory, HelpCircle } from 'lucide-react';
+import { Flag, Map, Globe, FlaskConical, Factory, HelpCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import { GameState, CountryStats, TerritoryState } from '@shared/types';
+import { RESEARCH_DESCRIPTIONS } from '@shared/constants';
+import { formatManpower } from '../lib/mapColors';
 
 type Tab = 'country' | 'territory' | 'diplomacy' | 'research' | 'production';
 
@@ -27,10 +29,35 @@ const RightSidebar: React.FC<Props> = ({
 }) => {
   const myCountry = myCountryId ? gameState?.countries[myCountryId] : null;
   const selectedTerritory = selectedTerritoryId ? gameState?.territories[selectedTerritoryId] : null;
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (collapsed) {
+    return (
+      <aside className="flex flex-col w-8 shrink-0 bg-gray-950 border-l border-gray-800">
+        <button
+          onClick={() => setCollapsed(false)}
+          className="flex items-center justify-center py-3 text-gray-500 hover:text-yellow-400 hover:bg-gray-900 transition-colors border-b border-gray-800"
+          title="Expand sidebar"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <div className="flex flex-col items-center gap-3 py-3 text-gray-700 text-[10px] [writing-mode:vertical-rl] rotate-180 tracking-widest uppercase">
+          Panels
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="flex flex-col w-72 shrink-0 bg-gray-950 border-l border-gray-800 overflow-hidden">
       <div className="flex border-b border-gray-800">
+        <button
+          onClick={() => setCollapsed(true)}
+          className="px-2 text-gray-600 hover:text-yellow-400 transition-colors border-r border-gray-800"
+          title="Collapse sidebar for full map"
+        >
+          <ChevronRight size={14} />
+        </button>
         {TABS.map(tab => (
           <button
             key={tab.id}
@@ -82,7 +109,7 @@ const CountryTab: React.FC<{ country: CountryStats | null | undefined }> = ({ co
     { label: '⚔️ Army',      value: `${country.army} div.`,              color: 'text-red-400' },
     { label: '✈️ Air',       value: country.airPower.toLocaleString(),    color: 'text-sky-400' },
     { label: '🚢 Navy',      value: country.navalPower.toLocaleString(),  color: 'text-blue-400' },
-    { label: '👥 Manpower',  value: `${country.manpower.toLocaleString()}k`, color: 'text-green-400' },
+    { label: '👥 Manpower',  value: formatManpower(country.manpower), color: 'text-green-400' },
     { label: '🏭 Industry',  value: country.industry.toLocaleString(),    color: 'text-yellow-400' },
     { label: '💰 Money',     value: `$${country.money}`,                  color: 'text-yellow-300' },
     { label: '🛢 Oil',       value: country.resources.oil.toLocaleString(),   color: 'text-orange-400' },
@@ -181,7 +208,7 @@ const TerritoryTab: React.FC<{ territory: TerritoryState | null | undefined; gam
           { label: 'Garrison',  value: `${territory.garrison} div.`,                              color: 'text-white' },
           { label: 'Fort',      value: '★'.repeat(territory.fortLevel)+'☆'.repeat(5-territory.fortLevel), color: 'text-yellow-400' },
           { label: 'Industry',  value: String(territory.industryOutput),                          color: 'text-blue-400' },
-          { label: 'Manpower',  value: `${territory.manpowerOutput}k`,                            color: 'text-green-400' },
+          { label: 'Manpower',  value: formatManpower(territory.manpowerOutput),                  color: 'text-green-400' },
           { label: 'Supply',    value: `${Math.round(territory.supplyLevel*100)}%`,               color: territory.supplyLevel > 0.7 ? 'text-green-400' : 'text-yellow-400' },
           ...(territory.resourceOutput.oil   ? [{ label: 'Oil',   value: String(territory.resourceOutput.oil),   color: 'text-orange-400' }] : []),
           ...(territory.resourceOutput.steel ? [{ label: 'Steel', value: String(territory.resourceOutput.steel), color: 'text-gray-300' }] : []),
@@ -249,6 +276,7 @@ const RESEARCH_ITEMS = [
   { id: 'nuclear',   label: '☢️ Nuclear' },
 ];
 
+
 const ResearchTab: React.FC<{ country: CountryStats | null | undefined }> = ({ country }) => {
   if (!country) return <Placeholder text="No country assigned." />;
   return (
@@ -263,16 +291,28 @@ const ResearchTab: React.FC<{ country: CountryStats | null | undefined }> = ({ c
       <div className="space-y-2">
         {RESEARCH_ITEMS.map(item => {
           const pct = country.researchProgress[item.id as keyof typeof country.researchProgress] ?? 0;
+          const lvl = country.researchLevel?.[item.id as keyof typeof country.researchLevel] ?? 0;
+          const desc = RESEARCH_DESCRIPTIONS[item.id as keyof typeof RESEARCH_DESCRIPTIONS];
           return (
             <div key={item.id} className="bg-gray-900 border border-gray-800 rounded-lg p-2">
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-white text-xs">{item.label}</span>
-                <span className="text-gray-500 text-[10px]">{pct}%</span>
+                <span className="flex items-center gap-1.5">
+                  {lvl > 0 && (
+                    <span className="bg-purple-900 border border-purple-700 text-purple-200 text-[9px] px-1.5 py-0.5 rounded-full font-semibold">
+                      Lvl {lvl}
+                    </span>
+                  )}
+                  <span className="text-gray-500 text-[10px]">{pct}%</span>
+                </span>
               </div>
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <motion.div className="h-full bg-purple-600 rounded-full"
                   animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
               </div>
+              {desc && (
+                <div className="mt-1 text-[10px] text-purple-300">{desc.effect}</div>
+              )}
             </div>
           );
         })}

@@ -1,8 +1,14 @@
 import { CountryStats, TerritoryState, CombatResult } from './types';
 import {
   TERRAIN_MULTIPLIERS, FORT_MULT_PER_LEVEL, ATK_LOSS_RATE, DEF_LOSS_RATE,
-  FOG_MIN, FOG_MAX, CAPTURE_THRESHOLD, AIR_SUP_RATIO, AIR_SUP_BONUS
+  FOG_MIN, FOG_MAX, CAPTURE_THRESHOLD, AIR_SUP_RATIO, AIR_SUP_BONUS,
+  HOMELAND_DEF_BONUS, MAJOR_POWER_DEF_BONUS, MAJOR_POWERS,
+  NAVAL_INVASION_ATK_PENALTY, RESOURCE_STARVATION_MULT
 } from './constants';
+
+function isResourceStarved(c: { resources: { oil: number; steel: number; food: number } }): boolean {
+  return c.resources.oil <= 0 && c.resources.steel <= 0 && c.resources.food <= 0;
+}
 
 function seededRng(seed: number): number {
   const x = Math.sin(seed) * 10000;
@@ -16,7 +22,9 @@ export function resolveCombat(
   from: TerritoryState,
   to: TerritoryState,
   turn: number,
-  actionIndex: number = 0
+  actionIndex: number = 0,
+  isNavalInvasion: boolean = false,
+  supplyMult: number = 1.0
 ): CombatResult {
   const terrainMult = TERRAIN_MULTIPLIERS[to.terrain] ?? 1.0;
   const fortMult = 1 + FORT_MULT_PER_LEVEL * to.fortLevel;
@@ -26,8 +34,39 @@ export function resolveCombat(
   const atkAirBonus = attacker.airPower > defender.airPower * AIR_SUP_RATIO ? AIR_SUP_BONUS : 0;
   const defAirBonus = defender.airPower > attacker.airPower * AIR_SUP_RATIO ? AIR_SUP_BONUS : 0;
 
-  let atkStr = (attackerForce * attacker.techLevel * (attacker.morale / 100) + attacker.airPower * 0.4) * (1 + atkAirBonus);
-  let defStr = (defenderForce * defender.techLevel * (defender.morale / 100) * terrainMult * fortMult * supplyFactor + defender.airPower * 0.4) * (1 + defAirBonus);
+  // Defenders fight harder in their homeland and harder still if they're a major power
+  const isHomeland = to.originalOwnerId === defender.id;
+  const isMajorDefender = (MAJOR_POWERS as readonly string[]).includes(defender.id);
+  const homelandBonus = isHomeland ? HOMELAND_DEF_BONUS : 0;
+  const majorBonus = isMajorDefender && isHomeland ? MAJOR_POWER_DEF_BONUS : 0;
+  const defNationalBonus = 1 + homelandBonus + majorBonus;
+
+  // Air power is divided across the country's territories — entire RAF can't defend one outpost
+  const atkAirLocal = attacker.airPower / Math.max(1, attacker.territories.length);
+  const defAirLocal = defender.airPower / Math.max(1, defender.territories.length);
+
+  // Research bonuses — accumulate based on completed research levels per category
+  // Infantry → offense, Rockets → offense, Nuclear → offense
+  const atkInfL  = attacker.researchLevel?.infantry ?? 0;
+  const atkRckL  = attacker.researchLevel?.rockets  ?? 0;
+  const atkAirL  = attacker.researchLevel?.aircraft ?? 0;
+  const atkNucL  = attacker.researchLevel?.nuclear  ?? 0;
+  const atkResBonus = 1 + atkInfL * 0.05 + atkRckL * 0.05 + atkNucL * 0.10;
+  const atkAirResMult = 1 + atkAirL * 0.15;
+
+  // Armor → defense, Radar → defense, Naval gives defense at sea
+  const defArmL  = defender.researchLevel?.armor    ?? 0;
+  const defRadL  = defender.researchLevel?.radar    ?? 0;
+  const defAirL  = defender.researchLevel?.aircraft ?? 0;
+  const defNucL  = defender.researchLevel?.nuclear  ?? 0;
+  const defResBonus = 1 + defArmL * 0.08 + defRadL * 0.03 + defNucL * 0.08;
+  const defAirResMult = 1 + defAirL * 0.15;
+
+  const navalPenalty = isNavalInvasion ? (1 - NAVAL_INVASION_ATK_PENALTY) : 1;
+  const atkStarvation = isResourceStarved(attacker) ? RESOURCE_STARVATION_MULT : 1;
+  const defStarvation = isResourceStarved(defender) ? RESOURCE_STARVATION_MULT : 1;
+  let atkStr = (attackerForce * attacker.techLevel * (attacker.morale / 100) + atkAirLocal * 0.4 * atkAirResMult) * (1 + atkAirBonus) * navalPenalty * atkResBonus * supplyMult * atkStarvation;
+  let defStr = (defenderForce * defender.techLevel * (defender.morale / 100) * terrainMult * fortMult * supplyFactor * defNationalBonus + defAirLocal * 0.4 * defAirResMult) * (1 + defAirBonus) * defResBonus * defStarvation;
 
   const seed = turn * 10000 + actionIndex;
   const atkFog = FOG_MIN + seededRng(seed) * (FOG_MAX - FOG_MIN);
@@ -39,7 +78,7 @@ export function resolveCombat(
   const atkLosses = Math.max(0, Math.round((defStr / total) * attackerForce * ATK_LOSS_RATE));
   const defLosses = Math.max(0, Math.round((atkStr / total) * defenderForce * DEF_LOSS_RATE));
   const remainingAtk = attackerForce - atkLosses;
-  const captured = atkStr > defStr * CAPTURE_THRESHOLD && remainingAtk > 1;
+  const captured = atkStr > defStr * CAPTURE_THRESHOLD && remainingAtk >= 1;
 
   return {
     attackerId: attacker.id,

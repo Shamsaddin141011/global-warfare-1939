@@ -43,3 +43,12 @@ export const MONTH_NAMES = [
   '', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+// Manpower values are stored as "thousands of people"; display as millions.
+export function formatManpower(thousands: number): string {
+  const m = thousands / 1000;
+  if (m >= 100) return `${Math.round(m)}M`;
+  if (m >= 10)  return `${m.toFixed(1)}M`;
+  if (m >= 1)   return `${m.toFixed(2)}M`;
+  return `${m.toFixed(2)}M`;
+}

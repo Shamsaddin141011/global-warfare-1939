@@ -416,5 +416,21 @@
     "atWarWith": [], "alliedWith": ["uk"],
     "capital": "canada",
     "startingTerritories": []
+  },
+  "wilderness": {
+    "id": "wilderness", "name": "The Wilderness", "fullName": "Unaligned Ghostlands",
+    "faction": "neutral", "aiPersonality": "isolationist", "color": "#6B6B6B", "flag": "🌫",
+    "army": 60, "airPower": 0, "navalPower": 0,
+    "manpower": 8000, "industry": 20,
+    "resources": { "oil": 5, "steel": 10, "food": 40 },
+    "money": 80, "morale": 50, "techLevel": 1.0, "researchPoints": 0, "warExhaustion": 0,
+    "atWarWith": [], "alliedWith": [],
+    "capital": "iceland",
+    "startingTerritories": [
+      "iceland", "ireland", "greenland", "cuba", "colombia", "venezuela", "peru",
+      "chile", "bolivia", "paraguay", "uruguay", "ecuador", "yemen", "oman",
+      "afghanistan", "sri-lanka", "cambodia", "laos", "tanzania", "uganda",
+      "zambia", "zimbabwe", "botswana", "namibia", "palestine"
+    ]
   }
 }
