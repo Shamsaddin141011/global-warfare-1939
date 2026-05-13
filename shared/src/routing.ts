@@ -8,14 +8,28 @@ function directlyAdjacent(t: TerritoryState, targetId: string): boolean {
   return t.adjacentTo.includes(targetId) || (t.navalAdjacentTo?.includes(targetId) ?? false);
 }
 
+// Any coastal territory can reach any other coastal territory by sea.
+function canReachTarget(t: TerritoryState, targetId: string, targetT: TerritoryState): boolean {
+  return directlyAdjacent(t, targetId) || (t.isCoastal && targetT.isCoastal);
+}
+
+export function isNavalAttack(launchPoint: TerritoryState, toT: TerritoryState): boolean {
+  const isLandAdj = launchPoint.adjacentTo.includes(toT.id);
+  const isSeaAdj =
+    (launchPoint.navalAdjacentTo?.includes(toT.id) ?? false) ||
+    (launchPoint.isCoastal && toT.isCoastal);
+  return !isLandAdj && isSeaAdj;
+}
+
 /**
  * BFS from `fromId` through territories owned by `ownerId`. Returns the shortest
- * path (list of owned-territory ids) whose last element is directly adjacent
- * (land or naval) to `targetId`. The target itself is NOT included.
+ * path (list of owned-territory ids) whose last element can reach `targetId`
+ * (by land adjacency, explicit naval adjacency, or coastal-to-coastal sea crossing).
  *
- * Returns null when no path exists.
+ * Returns null when no path exists (e.g. source country has no coastal territory
+ * and target is not land-adjacent).
  *
- * path.length === 1 means the source is directly adjacent to the target.
+ * path.length === 1 means the source itself is the launch point.
  */
 export function findCorridor(
   state: GameState,
@@ -26,8 +40,10 @@ export function findCorridor(
   if (fromId === targetId) return null;
   const fromT = state.territories[fromId];
   if (!fromT || fromT.ownerId !== ownerId) return null;
+  const targetT = state.territories[targetId];
+  if (!targetT) return null;
 
-  if (directlyAdjacent(fromT, targetId)) return [fromId];
+  if (canReachTarget(fromT, targetId, targetT)) return [fromId];
 
   const queue: string[][] = [[fromId]];
   const visited = new Set<string>([fromId]);
@@ -41,12 +57,9 @@ export function findCorridor(
       if (visited.has(nId)) continue;
       const nT = state.territories[nId];
       if (!nT) continue;
-
-      // Only traverse through owned territories
       if (nT.ownerId !== ownerId) continue;
 
-      // Found a launch point — this owned territory is directly adjacent to target
-      if (directlyAdjacent(nT, targetId)) {
+      if (canReachTarget(nT, targetId, targetT)) {
         return [...path, nId];
       }
 

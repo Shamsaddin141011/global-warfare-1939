@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {
   ServerToClientEvents, ClientToServerEvents,
-  PlayerAction, ChatMessage, GameSettings, GameState
+  PlayerAction, ChatMessage, GameSettings, GameState, GameEvent
 } from '../../shared/src/types';
 import * as LobbyService from './lobby';
 import { advanceTurn } from './gameEngine';
@@ -37,7 +37,7 @@ const turnTimers = new Map<string, ReturnType<typeof setInterval>>();
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // Serve the built client if it exists (production / tunnel-friendly mode)
-const clientDist = path.join(__dirname, '../../client/dist');
+const clientDist = path.join(__dirname, '../../../../client/dist');
 const hasBuiltClient = fs.existsSync(path.join(clientDist, 'index.html'));
 
 if (hasBuiltClient) {
@@ -328,7 +328,7 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
     }).catch(() => {});
   }
 
-  if (state.phase === 'planning') {
+  if ((state.phase as string) !== 'ended') {
     const lobby = LobbyService.getLobby(roomCode);
     startTurnTimer(roomCode, gameId, lobby?.settings.turnTimerSeconds ?? 300);
   }

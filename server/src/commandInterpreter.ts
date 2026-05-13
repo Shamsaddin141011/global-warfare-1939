@@ -1,5 +1,5 @@
 import { GameState, PlayerAction, CommandResult } from '../../shared/src/types';
-import { findCorridor, findAttackOption, buildAttackOption } from '../../shared/src/routing';
+import { findCorridor, findAttackOption, buildAttackOption, isNavalAttack } from '../../shared/src/routing';
 import { productionCap, RESEARCH_DESCRIPTIONS } from '../../shared/src/constants';
 
 export function interpretCommand(
@@ -165,8 +165,8 @@ export function interpretCommand(
       ? ` via ${corridorNames} (${route.hops}-hop, ${Math.round((1 - route.supplyMult) * 100)}% supply penalty)`
       : '';
 
-    const isNaval = !state.territories[route.launchPointId]?.adjacentTo.includes(targetId)
-      && (state.territories[route.launchPointId]?.navalAdjacentTo?.includes(targetId) ?? false);
+    const launchT = state.territories[route.launchPointId];
+    const isNaval = !!launchT && isNavalAttack(launchT, target);
     const navalTag = isNaval ? ' [naval invasion]' : '';
 
     return {

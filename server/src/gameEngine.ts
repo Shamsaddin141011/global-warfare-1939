@@ -3,7 +3,7 @@ import { resolveCombat } from '../../shared/src/combat';
 import { tickEconomy } from '../../shared/src/economy';
 import { generateAIActions } from '../../shared/src/aiLogic';
 import { RESEARCH_CATEGORIES, productionCap } from '../../shared/src/constants';
-import { findCorridor, buildAttackOption } from '../../shared/src/routing';
+import { findCorridor, buildAttackOption, isNavalAttack } from '../../shared/src/routing';
 
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -83,10 +83,7 @@ function processAction(
       const launchPoint = state.territories[route.launchPointId];
       if (!launchPoint) return;
 
-      // Naval invasion check uses the LAUNCH POINT, not the source territory
-      const isLandAdj = launchPoint.adjacentTo.includes(toT.id);
-      const isSeaAdj = launchPoint.navalAdjacentTo?.includes(toT.id) ?? false;
-      const isNaval = !isLandAdj && isSeaAdj;
+      const isNaval = isNavalAttack(launchPoint, toT);
 
       if (toT.ownerId === action.countryId) {
         // Friendly move — troops physically move from source to target along the corridor

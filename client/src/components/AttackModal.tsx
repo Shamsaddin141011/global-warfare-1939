@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Swords, X, Ship, AlertTriangle } from 'lucide-react';
 import { GameState } from '@shared/types';
+import { findCorridor, isNavalAttack } from '@shared/routing';
 
 interface Props {
   source: string;
@@ -30,10 +31,10 @@ const AttackModal: React.FC<Props> = ({ source, target, gameState, myCountryId, 
   }
 
   const isFriendly = toT.ownerId === myCountryId;
-  const isLandAdj = fromT.adjacentTo.includes(target);
-  const isSeaAdj = fromT.navalAdjacentTo?.includes(target) ?? false;
-  const reachable = isLandAdj || isSeaAdj;
-  const isNaval = !isLandAdj && isSeaAdj;
+  const corridor = myCountryId ? findCorridor(gameState, source, target, myCountryId) : null;
+  const launchPoint = corridor ? gameState.territories[corridor[corridor.length - 1]] : null;
+  const reachable = corridor !== null;
+  const isNaval = reachable && !!launchPoint && isNavalAttack(launchPoint, toT);
   const wouldDeclareWar = !isFriendly && toOwner && !gameState.countries[myCountryId ?? '']?.atWarWith.includes(toT.ownerId);
 
   return (
