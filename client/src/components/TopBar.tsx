@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Swords, Clock, CheckCircle, Circle, FastForward, Crosshair, MoveRight } from 'lucide-react';
 import { GameState, Lobby } from '@shared/types';
+import { GAME_VERSION } from '@shared/constants';
 import { MONTH_NAMES } from '../lib/mapColors';
 
 type MapMode = 'inspect' | 'attack' | 'move';
@@ -52,6 +53,7 @@ const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, p
           <div className="flex items-center gap-2">
             <Swords size={20} className="text-yellow-500" />
             <span className="text-yellow-400 font-bold tracking-widest text-sm uppercase">Global Warfare</span>
+            <span className="text-gray-600 text-[9px] font-mono ml-1">{GAME_VERSION}</span>
           </div>
           {gameState && (
             <div className="text-gray-300 text-sm font-mono border-l border-gray-700 pl-4">

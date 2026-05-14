@@ -55,7 +55,6 @@ export default function App() {
     setAttackTarget(null);
   }
 
-  const myNukeLevel = gameState?.countries[myCountryId ?? '']?.researchLevel?.nuclear ?? 0;
   const myNukeBuildProgress = gameState?.countries[myCountryId ?? '']?.nukeBuildProgress ?? 0;
 
   function onMapClick(territoryId: string) {
@@ -194,8 +193,8 @@ export default function App() {
                   onCenterChange={setCenter}
                   onTerritoryClick={onMapClick}
                   nukingMode={nukingMode}
-                  nukeUnlocked={myNukeLevel >= 3}
-                  nukeReady={myNukeLevel >= 3 && myNukeBuildProgress >= 100}
+                  nukeUnlocked={myNukeBuildProgress >= 100}
+                  nukeReady={myNukeBuildProgress >= 100}
                   nukeBuildProgress={myNukeBuildProgress}
                   nukeAnimation={nukeAnimation ?? null}
                   onNukeButtonClick={() => setNukingMode(m => !m)}

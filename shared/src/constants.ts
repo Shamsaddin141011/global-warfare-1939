@@ -9,14 +9,14 @@ export const TERRAIN_MULTIPLIERS: Record<string, number> = {
   tundra: 1.1,
 };
 
-export const FORT_MULT_PER_LEVEL = 0.22;
+export const FORT_MULT_PER_LEVEL = 0.15;
 export const ATK_LOSS_RATE = 0.65;
 export const DEF_LOSS_RATE = 0.50;
 export const FOG_MIN = 0.85;
 export const FOG_MAX = 1.15;
-export const CAPTURE_THRESHOLD = 1.40;
-export const HOMELAND_DEF_BONUS = 0.30;
-export const MAJOR_POWER_DEF_BONUS = 0.25;
+export const CAPTURE_THRESHOLD = 1.10;
+export const HOMELAND_DEF_BONUS = 0.20;
+export const MAJOR_POWER_DEF_BONUS = 0.15;
 export const NAVAL_INVASION_ATK_PENALTY = 0.25;
 export const AIR_SUP_RATIO = 2.0;
 export const AIR_SUP_BONUS = 0.2;
@@ -86,6 +86,8 @@ export const COUNTRY_COLORS: Record<string, string> = {
   australia: '#4a6878',
   wilderness:'#5a5a5a',
 };
+
+export const GAME_VERSION = 'v0.4.1';
 
 export const STARTING_YEAR = 1939;
 export const STARTING_MONTH = 9;

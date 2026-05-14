@@ -611,11 +611,7 @@ const WorldMap: React.FC<Props> = ({
 
       {/* Nuke button */}
       <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 190 }}>
-        {!nukeUnlocked ? (
-          <div style={{ background: 'rgba(20,20,20,0.88)', border: '1px solid #444', borderRadius: 6, padding: '8px 12px', color: '#555', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
-            🔒 Nuclear Lv.3 Required
-          </div>
-        ) : !nukeReady ? (
+        {!nukeReady ? (
           <div style={{ background: 'rgba(10,20,10,0.92)', border: '1px solid #336633', borderRadius: 6, padding: '8px 12px', width: 190 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#66ff88', marginBottom: 5 }}>
               ☢ Arming Warhead… {nukeBuildProgress}%

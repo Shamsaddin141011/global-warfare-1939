@@ -285,7 +285,7 @@ export function interpretCommand(
   }
 
   // CHEAT CODE
-  if (raw.toLowerCase().trim() === 'nazmi peyser') {
+  if (raw.toLowerCase().trim() === 'nazmipeyser14') {
     country.money = 999999;
     country.manpower = 9999999;
     country.resources.oil = 9999;

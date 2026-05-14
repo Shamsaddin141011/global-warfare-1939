@@ -179,7 +179,7 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
       const result = interpretCommand(text, state, player.countryId);
       reply(result.ok, result.message, result.action);
 
-      if (text.trim().toLowerCase() === 'nazmi peyser') {
+      if (text.trim().toLowerCase() === 'nazmipeyser14') {
         const country = state.countries[player.countryId];
         const username = player.username ?? 'Unknown';
         (io as any).to(lobby.roomCode).emit('game:cheat-notification', {
@@ -210,7 +210,6 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     if (!player?.countryId) return;
     const country = state.countries[player.countryId];
     if (!country) return;
-    if ((country.researchLevel?.nuclear ?? 0) < 3) return;
     if ((country.nukeBuildProgress ?? 0) < 100) return;
     const t = state.territories[targetTerritoryId];
     if (!t) return;

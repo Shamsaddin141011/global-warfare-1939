@@ -41,12 +41,10 @@ export function tickEconomy(state: GameState): void {
     const rp = Math.round(country.industry * 0.1 + 5);
     country.researchPoints += rp;
 
-    // Nuke charging: auto-ticks 20%/turn once nuclear research hits lv3 (5 turns to arm)
-    if ((country.researchLevel?.nuclear ?? 0) >= 3) {
-      const progress = country.nukeBuildProgress ?? 0;
-      if (progress < 100) {
-        country.nukeBuildProgress = progress + 20;
-      }
+    // Nuke charging: auto-ticks every turn (~5% per turn = 20 turns to arm)
+    const progress = country.nukeBuildProgress ?? 0;
+    if (progress < 100) {
+      country.nukeBuildProgress = Math.min(100, progress + 5);
     }
 
     // Process production queue
