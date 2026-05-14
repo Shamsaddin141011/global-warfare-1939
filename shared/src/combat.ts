@@ -41,32 +41,33 @@ export function resolveCombat(
   const majorBonus = isMajorDefender && isHomeland ? MAJOR_POWER_DEF_BONUS : 0;
   const defNationalBonus = 1 + homelandBonus + majorBonus;
 
-  // Air power is divided across the country's territories — entire RAF can't defend one outpost
+  // Air provides a multiplicative bonus (capped at +25%) so numbers still decide battles.
+  // Aircraft research extends the cap by 5% per level.
+  const atkAirL  = attacker.researchLevel?.aircraft ?? 0;
+  const defAirL  = defender.researchLevel?.aircraft ?? 0;
   const atkAirLocal = attacker.airPower / Math.max(1, attacker.territories.length);
   const defAirLocal = defender.airPower / Math.max(1, defender.territories.length);
+  const atkAirMult = 1 + Math.min(0.25 + atkAirL * 0.05, atkAirLocal / 1000);
+  const defAirMult = 1 + Math.min(0.25 + defAirL * 0.05, defAirLocal / 1000);
 
   // Research bonuses — accumulate based on completed research levels per category
   // Infantry → offense, Rockets → offense, Nuclear → offense
   const atkInfL  = attacker.researchLevel?.infantry ?? 0;
   const atkRckL  = attacker.researchLevel?.rockets  ?? 0;
-  const atkAirL  = attacker.researchLevel?.aircraft ?? 0;
   const atkNucL  = attacker.researchLevel?.nuclear  ?? 0;
   const atkResBonus = 1 + atkInfL * 0.05 + atkRckL * 0.05 + atkNucL * 0.10;
-  const atkAirResMult = 1 + atkAirL * 0.15;
 
-  // Armor → defense, Radar → defense, Naval gives defense at sea
+  // Armor → defense, Radar → defense
   const defArmL  = defender.researchLevel?.armor    ?? 0;
   const defRadL  = defender.researchLevel?.radar    ?? 0;
-  const defAirL  = defender.researchLevel?.aircraft ?? 0;
   const defNucL  = defender.researchLevel?.nuclear  ?? 0;
   const defResBonus = 1 + defArmL * 0.08 + defRadL * 0.03 + defNucL * 0.08;
-  const defAirResMult = 1 + defAirL * 0.15;
 
   const navalPenalty = isNavalInvasion ? (1 - NAVAL_INVASION_ATK_PENALTY) : 1;
   const atkStarvation = isResourceStarved(attacker) ? RESOURCE_STARVATION_MULT : 1;
   const defStarvation = isResourceStarved(defender) ? RESOURCE_STARVATION_MULT : 1;
-  let atkStr = (attackerForce * attacker.techLevel * (attacker.morale / 100) + atkAirLocal * 0.4 * atkAirResMult) * (1 + atkAirBonus) * navalPenalty * atkResBonus * supplyMult * atkStarvation;
-  let defStr = (defenderForce * defender.techLevel * (defender.morale / 100) * terrainMult * fortMult * supplyFactor * defNationalBonus + defAirLocal * 0.4 * defAirResMult) * (1 + defAirBonus) * defResBonus * defStarvation;
+  let atkStr = attackerForce * attacker.techLevel * (attacker.morale / 100) * atkAirMult * (1 + atkAirBonus) * navalPenalty * atkResBonus * supplyMult * atkStarvation;
+  let defStr = defenderForce * defender.techLevel * (defender.morale / 100) * terrainMult * fortMult * supplyFactor * defNationalBonus * defAirMult * (1 + defAirBonus) * defResBonus * defStarvation;
 
   const seed = turn * 10000 + actionIndex;
   const atkFog = FOG_MIN + seededRng(seed) * (FOG_MAX - FOG_MIN);
