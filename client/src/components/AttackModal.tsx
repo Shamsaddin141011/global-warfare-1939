@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Swords, X, Ship, AlertTriangle } from 'lucide-react';
+import { Swords, X, Ship, AlertTriangle, ArrowRight } from 'lucide-react';
 import { GameState } from '@shared/types';
 import { findCorridor, isNavalAttack } from '@shared/routing';
 
@@ -47,7 +47,7 @@ const AttackModal: React.FC<Props> = ({ source, target, gameState, myCountryId, 
       onClick={onCancel}
     >
       <motion.div
-        className="bg-gray-950 border border-yellow-800 rounded-xl shadow-2xl w-full max-w-md"
+        className={`bg-gray-950 border rounded-xl shadow-2xl w-full max-w-md ${isFriendly ? 'border-blue-800' : 'border-yellow-800'}`}
         initial={{ scale: 0.85, y: -20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.85, opacity: 0 }}
@@ -55,8 +55,10 @@ const AttackModal: React.FC<Props> = ({ source, target, gameState, myCountryId, 
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            {isNaval ? <Ship size={16} className="text-blue-400" /> : <Swords size={16} className="text-yellow-400" />}
-            <h2 className="text-yellow-400 font-bold text-base">
+            {isFriendly
+              ? <ArrowRight size={16} className="text-blue-400" />
+              : isNaval ? <Ship size={16} className="text-blue-400" /> : <Swords size={16} className="text-yellow-400" />}
+            <h2 className={`font-bold text-base ${isFriendly ? 'text-blue-400' : 'text-yellow-400'}`}>
               {isFriendly ? 'Move Troops' : isNaval ? 'Naval Invasion' : 'Attack'}
             </h2>
           </div>
@@ -109,8 +111,11 @@ const AttackModal: React.FC<Props> = ({ source, target, gameState, myCountryId, 
           {/* Force slider */}
           <div>
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-400">Force size</span>
-              <span className="text-yellow-300 font-mono font-bold">{force} / {maxForce} max</span>
+              <span className="text-gray-400">{isFriendly ? 'Divisions to send' : 'Force size'}</span>
+              <span className={`font-mono font-bold ${isFriendly ? 'text-blue-300' : 'text-yellow-300'}`}>
+                {force} / {maxForce} available
+                {isFriendly && ` · ${Math.max(0, 30 - toT.garrison)} space`}
+              </span>
             </div>
             <input
               type="range"
@@ -148,7 +153,7 @@ const AttackModal: React.FC<Props> = ({ source, target, gameState, myCountryId, 
           </div>
         </div>
 
-        <div className="border-t border-gray-800 px-5 py-3 flex justify-end gap-2">
+        <div className={`border-t px-5 py-3 flex justify-end gap-2 ${isFriendly ? 'border-blue-900' : 'border-gray-800'}`}>
           <button
             onClick={onCancel}
             className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm"

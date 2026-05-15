@@ -39,8 +39,8 @@ export default function App() {
     handleTerritoryClick, addAction, removeAction, clearActions, clearSelection,
   } = useGameState(myCountryId);
 
-  const [zoom, setZoom] = useState(1);
-  const [center, setCenter] = useState<[number, number]>([15, 30]);
+  const [zoom, setZoom] = useState(1.2);
+  const [center, setCenter] = useState<[number, number]>([20, 30]);
   const [showTutorial, setShowTutorial] = useState(false);
   const [shownRecapTurn, setShownRecapTurn] = useState<number>(-1);
   const [nukingMode, setNukingMode] = useState(false);

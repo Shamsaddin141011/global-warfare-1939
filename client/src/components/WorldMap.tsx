@@ -9,7 +9,7 @@ import { Delaunay } from 'd3-delaunay';
 import { geoMercator, geoPath } from 'd3-geo';
 
 const MAJOR_COUNTRIES = ['germany', 'ussr', 'france', 'uk', 'italy', 'japan', 'usa', 'china'] as const;
-const MAP_PROJECTION = geoMercator().scale(160).translate([400, 300]);
+const MAP_PROJECTION = geoMercator().scale(220).translate([400, 300]);
 const MAP_PATH_GEN = geoPath(MAP_PROJECTION as any);
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
@@ -337,7 +337,7 @@ const WorldMap: React.FC<Props> = ({
 
       <ComposableMap
         projection="geoMercator"
-        projectionConfig={{ scale: 160 }}
+        projectionConfig={{ scale: 220 }}
         style={{ width: '100%', height: '100%' }}
       >
         <ZoomableGroup
@@ -686,7 +686,7 @@ const WorldMap: React.FC<Props> = ({
         {[
           { label: '+', action: () => onZoomChange(Math.min(12, zoom * 1.4)) },
           { label: '−', action: () => onZoomChange(Math.max(0.8, zoom / 1.4)) },
-          { label: '⌂', action: () => { onZoomChange(1.5); onCenterChange([15, 25]); } },
+          { label: '⌂', action: () => { onZoomChange(1.2); onCenterChange([20, 30]); } },
         ].map(btn => (
           <button key={btn.label} onClick={btn.action} style={{
             width: 32, height: 32, background: 'rgba(17,24,39,0.9)',
