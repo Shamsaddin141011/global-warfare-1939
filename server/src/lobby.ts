@@ -202,6 +202,18 @@ export function registerRejoinedPlayer(playerId: string, countryId: string, room
   return lobby;
 }
 
+export function kickPlayer(hostId: string, targetPlayerId: string): { lobby: Lobby; kickedCountryId: string | null } | null {
+  const lobby = getLobbyForPlayer(hostId);
+  if (!lobby || lobby.hostId !== hostId) return null;
+  const target = lobby.players[targetPlayerId];
+  if (!target || targetPlayerId === hostId) return null;
+  const kickedCountryId = target.countryId ?? null;
+  if (kickedCountryId) lobby.availableCountries.push(kickedCountryId);
+  delete lobby.players[targetPlayerId];
+  playerToRoom.delete(targetPlayerId);
+  return { lobby, kickedCountryId };
+}
+
 export function removePlayer(playerId: string): Lobby | null {
   const lobby = getLobbyForPlayer(playerId);
   if (!lobby) return null;

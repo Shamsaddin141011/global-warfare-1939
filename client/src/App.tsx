@@ -28,7 +28,7 @@ export default function App() {
     isRejoining,
     createLobby, joinLobby, pickCountry, toggleReady, startGame, quickStart,
     submitActions, forceEndTurn, sendCommand, sendChat, clearCombatQueue, dismissRecap, launchNuke,
-    proposeAlliance, respondToAlliance, breakAlliance, leaveGame,
+    proposeAlliance, respondToAlliance, breakAlliance, leaveGame, kickPlayer,
   } = useSocket();
 
   const myPlayer = playerId && lobby ? lobby.players[playerId] : null;
@@ -202,6 +202,8 @@ export default function App() {
           onForceEnd={forceEndTurn}
           mapMode={mapMode}
           onSetMode={setMode}
+          onLeave={leaveGame}
+          onKickPlayer={kickPlayer}
         />
       )}
 
@@ -307,6 +309,8 @@ export default function App() {
             onToggleReady={toggleReady}
             onStartGame={startGame}
             onQuickStart={quickStart}
+            onLeave={leaveGame}
+            onKickPlayer={kickPlayer}
           />
         )}
       </div>

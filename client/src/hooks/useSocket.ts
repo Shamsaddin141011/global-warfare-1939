@@ -208,6 +208,10 @@ export function useSocket() {
       setState(s => ({ ...s, allyTroopsNotification: data }));
       setTimeout(() => setState(s => ({ ...s, allyTroopsNotification: null })), 6000);
     });
+    (socket as any).on('player:kicked', () => {
+      clearSession();
+      setState(s => ({ ...s, gameState: null, lobby: null, isRejoining: false }));
+    });
 
     return () => {
       socket.off('connect');
@@ -314,6 +318,10 @@ export function useSocket() {
     setState(s => ({ ...s, gameState: null, lobby: null, isRejoining: false }));
   }
 
+  function kickPlayer(targetPlayerId: string) {
+    (socket as any).emit('player:kick', { targetPlayerId });
+  }
+
   return {
     ...state,
     createLobby,
@@ -333,5 +341,6 @@ export function useSocket() {
     respondToAlliance,
     breakAlliance,
     leaveGame,
+    kickPlayer,
   };
 }

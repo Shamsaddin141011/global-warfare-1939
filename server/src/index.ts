@@ -422,6 +422,31 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     io.to(lobby.roomCode).emit('game:state', state);
   });
 
+  (socket as any).on('player:kick', ({ targetPlayerId }: { targetPlayerId: string }) => {
+    const result = LobbyService.kickPlayer(playerId, targetPlayerId);
+    if (!result) return;
+    const { lobby, kickedCountryId } = result;
+
+    // If game is running, turn kicked country back to AI
+    if (lobby.gameId && kickedCountryId) {
+      const state = games.get(lobby.gameId);
+      if (state && state.countries[kickedCountryId]) {
+        state.countries[kickedCountryId].isHuman = false;
+        state.submittedPlayers = state.submittedPlayers.filter(id => id !== kickedCountryId);
+        saveGame(state);
+        io.to(lobby.roomCode).emit('game:state', state);
+      }
+    }
+
+    const kickedSocketId = playerSockets.get(targetPlayerId);
+    if (kickedSocketId) {
+      (io as any).to(kickedSocketId).emit('player:kicked');
+      playerSockets.delete(targetPlayerId);
+    }
+
+    io.to(lobby.roomCode).emit('lobby:updated', lobby);
+  });
+
   socket.on('disconnect', () => {
     playerSockets.delete(playerId);
     console.log(`Client disconnected: ${playerId}`);

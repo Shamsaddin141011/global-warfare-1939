@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Swords, Users, Plus, LogIn, Check, Crown, Circle, Zap } from 'lucide-react';
+import { Swords, Users, Plus, LogIn, Check, Crown, Circle, Zap, LogOut, X } from 'lucide-react';
 import { Lobby as LobbyType } from '@shared/types';
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   onToggleReady: () => void;
   onStartGame: () => void;
   onQuickStart: (username: string) => void;
+  onLeave: () => void;
+  onKickPlayer: (playerId: string) => void;
 }
 
 const MAJOR_POWERS = [
@@ -26,7 +28,7 @@ const MAJOR_POWERS = [
 ];
 
 const Lobby: React.FC<Props> = ({
-  lobby, myPlayerId, onCreateLobby, onJoinLobby, onPickCountry, onToggleReady, onStartGame, onQuickStart,
+  lobby, myPlayerId, onCreateLobby, onJoinLobby, onPickCountry, onToggleReady, onStartGame, onQuickStart, onLeave, onKickPlayer,
 }) => {
   const [screen, setScreen] = useState<'home' | 'create' | 'join' | 'waiting' | 'solo'>('home');
   const [username, setUsername] = useState('');
@@ -211,9 +213,19 @@ const Lobby: React.FC<Props> = ({
                   {lobby.roomCode}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Users size={14} className="text-gray-500" />
-                <span className="text-gray-400 text-sm">{Object.keys(lobby.players).length} / {lobby.settings.maxPlayers}</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Users size={14} className="text-gray-500" />
+                  <span className="text-gray-400 text-sm">{Object.keys(lobby.players).length} / {lobby.settings.maxPlayers}</span>
+                </div>
+                <motion.button
+                  onClick={onLeave}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-gray-400 hover:text-red-400 hover:bg-gray-800 border border-gray-700 hover:border-red-800 transition-all text-xs"
+                  title="Leave war room"
+                >
+                  <LogOut size={13} /> Leave
+                </motion.button>
               </div>
             </div>
 
@@ -265,24 +277,36 @@ const Lobby: React.FC<Props> = ({
             <div className="mb-6">
               <div className="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-3">Players</div>
               <div className="flex flex-wrap gap-3">
-                {Object.values(lobby.players).map(player => (
-                  <div key={player.id}
-                    className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded px-3 py-2"
-                  >
-                    {player.isHost && <Crown size={12} className="text-yellow-400" />}
-                    <span className={player.isOnline ? 'text-green-400 online-dot text-[8px]' : 'text-gray-600 text-[8px]'}>●</span>
-                    <span className="text-white text-sm">{player.username || 'Joining…'}</span>
-                    {player.countryId && (
-                      <span className="text-lg">
-                        {MAJOR_POWERS.find(c => c.id === player.countryId)?.flag}
-                      </span>
-                    )}
-                    {player.isReady
-                      ? <Check size={12} className="text-green-400" />
-                      : <Circle size={12} className="text-gray-600" />
-                    }
-                  </div>
-                ))}
+                {Object.values(lobby.players).map(player => {
+                  const canKick = myPlayer?.isHost && player.id !== myPlayerId;
+                  return (
+                    <div key={player.id}
+                      className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded px-3 py-2"
+                    >
+                      {player.isHost && <Crown size={12} className="text-yellow-400" />}
+                      <span className={player.isOnline ? 'text-green-400 online-dot text-[8px]' : 'text-gray-600 text-[8px]'}>●</span>
+                      <span className="text-white text-sm">{player.username || 'Joining…'}</span>
+                      {player.countryId && (
+                        <span className="text-lg">
+                          {MAJOR_POWERS.find(c => c.id === player.countryId)?.flag}
+                        </span>
+                      )}
+                      {player.isReady
+                        ? <Check size={12} className="text-green-400" />
+                        : <Circle size={12} className="text-gray-600" />
+                      }
+                      {canKick && (
+                        <button
+                          onClick={() => onKickPlayer(player.id)}
+                          className="ml-1 text-gray-600 hover:text-red-400 transition-colors"
+                          title={`Kick ${player.username}`}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

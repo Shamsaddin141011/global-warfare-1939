@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Swords, Clock, CheckCircle, Circle, FastForward, Crosshair, MoveRight } from 'lucide-react';
+import { Swords, Clock, CheckCircle, Circle, FastForward, Crosshair, MoveRight, LogOut, X } from 'lucide-react';
 import { GameState, Lobby } from '@shared/types';
 import { GAME_VERSION } from '@shared/constants';
 import { MONTH_NAMES } from '../lib/mapColors';
@@ -17,9 +17,11 @@ interface Props {
   onForceEnd?: () => void;
   mapMode?: MapMode;
   onSetMode?: (m: MapMode) => void;
+  onLeave: () => void;
+  onKickPlayer?: (playerId: string) => void;
 }
 
-const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, pendingActionsCount, onEndTurn, onForceEnd, mapMode, onSetMode }) => {
+const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, pendingActionsCount, onEndTurn, onForceEnd, mapMode, onSetMode, onLeave, onKickPlayer }) => {
   const myPlayer = myPlayerId && lobby ? lobby.players[myPlayerId] : null;
   const myCountry = myPlayer?.countryId && gameState ? gameState.countries[myPlayer.countryId] : null;
   const submitted = gameState?.submittedPlayers.includes(myPlayerId ?? '');
@@ -67,11 +69,12 @@ const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, p
         <div className="flex items-center gap-2">
           {humanPlayers.map(player => {
             const country = player.countryId && gameState ? gameState.countries[player.countryId] : null;
-            const isSubmitted = gameState?.submittedPlayers.includes(player.id);
+            const isSubmitted = player.countryId ? gameState?.submittedPlayers.includes(player.countryId) : false;
+            const canKick = isHost && onKickPlayer && player.id !== myPlayerId;
             return (
               <motion.div
                 key={player.id}
-                className="flex items-center gap-1 px-2 py-1 rounded border text-xs"
+                className="flex items-center gap-1 px-2 py-1 rounded border text-xs group relative"
                 style={{
                   borderColor: country ? country.color + '88' : '#374151',
                   backgroundColor: country ? country.color + '22' : '#1f2937',
@@ -86,6 +89,15 @@ const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, p
                   <CheckCircle size={10} className="text-green-400" />
                 ) : (
                   <Circle size={10} className="text-gray-500" />
+                )}
+                {canKick && (
+                  <button
+                    onClick={() => onKickPlayer!(player.id)}
+                    className="ml-0.5 text-gray-600 hover:text-red-400 transition-colors"
+                    title={`Kick ${player.username}`}
+                  >
+                    <X size={10} />
+                  </button>
                 )}
               </motion.div>
             );
@@ -179,6 +191,15 @@ const TopBar: React.FC<Props> = ({ gameState, lobby, myPlayerId, timerSeconds, p
               </div>
             </div>
           )}
+
+          <motion.button
+            onClick={onLeave}
+            whileTap={{ scale: 0.95 }}
+            className="ml-2 p-1.5 rounded text-gray-500 hover:text-red-400 hover:bg-gray-800 border border-transparent hover:border-red-900 transition-all"
+            title="Leave game"
+          >
+            <LogOut size={15} />
+          </motion.button>
         </div>
       </div>
 
