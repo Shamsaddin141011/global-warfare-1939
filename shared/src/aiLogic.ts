@@ -22,6 +22,7 @@ function aggressiveAI(country: CountryStats, state: GameState): PlayerAction[] {
     for (const adjId of t.adjacentTo) {
       const adj = state.territories[adjId];
       if (!adj || adj.ownerId === country.id) continue;
+      if (country.alliedWith.includes(adj.ownerId)) continue;
       const adjOwner = state.countries[adj.ownerId];
       if (!adjOwner) continue;
 
@@ -107,6 +108,7 @@ function opportunistAI(country: CountryStats, state: GameState): PlayerAction[] 
     for (const adjId of t.adjacentTo) {
       const adj = state.territories[adjId];
       if (!adj || adj.ownerId === country.id) continue;
+      if (country.alliedWith.includes(adj.ownerId)) continue;
       const adjOwner = state.countries[adj.ownerId];
       if (!adjOwner) continue;
 

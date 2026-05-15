@@ -88,7 +88,7 @@ const RightSidebar: React.FC<Props> = ({
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12 }}
           >
-            {activeTab === 'country'    && <CountryTab country={myCountry} />}
+            {activeTab === 'country'    && <CountryTab country={myCountry} gameState={gameState} />}
             {activeTab === 'territory'  && <TerritoryTab territory={selectedTerritory} gameState={gameState} />}
             {activeTab === 'diplomacy'  && <DiplomacyTab gameState={gameState} myCountryId={myCountryId} />}
             {activeTab === 'research'   && <ResearchTab country={myCountry} />}
@@ -102,7 +102,7 @@ const RightSidebar: React.FC<Props> = ({
 
 // ── Country Tab ───────────────────────────────────────────────────────────────
 
-const CountryTab: React.FC<{ country: CountryStats | null | undefined }> = ({ country }) => {
+const CountryTab: React.FC<{ country: CountryStats | null | undefined; gameState: GameState | null }> = ({ country, gameState }) => {
   if (!country) return <Placeholder text="No country assigned." />;
 
   const stats = [
@@ -154,7 +154,14 @@ const CountryTab: React.FC<{ country: CountryStats | null | undefined }> = ({ co
       {country.alliedWith.length > 0 && (
         <div className="mt-2 p-2 rounded-lg bg-blue-950 border border-blue-800 text-xs">
           <div className="text-blue-400 font-semibold mb-1">ALLIED WITH</div>
-          {country.alliedWith.map(id => <div key={id} className="text-blue-300">• {id}</div>)}
+          {country.alliedWith.map(id => {
+            const ally = gameState?.countries[id];
+            return (
+              <div key={id} className="text-blue-300">
+                {ally ? `${ally.flag} ${ally.name}` : id}
+              </div>
+            );
+          })}
         </div>
       )}
 

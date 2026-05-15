@@ -30,7 +30,8 @@ const AttackModal: React.FC<Props> = ({ source, target, gameState, myCountryId, 
     return null;
   }
 
-  const isFriendly = toT.ownerId === myCountryId;
+  const isFriendly = toT.ownerId === myCountryId ||
+    !!(myCountryId && gameState.countries[myCountryId]?.alliedWith?.includes(toT.ownerId));
   const corridor = myCountryId ? findCorridor(gameState, source, target, myCountryId) : null;
   const launchPoint = corridor ? gameState.territories[corridor[corridor.length - 1]] : null;
   const reachable = corridor !== null;

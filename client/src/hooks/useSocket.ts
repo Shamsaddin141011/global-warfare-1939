@@ -27,6 +27,19 @@ export interface CheatNotification {
   countryFlag: string;
 }
 
+export interface AllianceRequest {
+  fromCountryId: string;
+  fromCountryName: string;
+  fromCountryFlag: string;
+}
+
+export interface AllyTroopsNotification {
+  fromCountryName: string;
+  fromCountryId: string;
+  forceSize: number;
+  territoryName: string;
+}
+
 export interface SocketState {
   connected: boolean;
   playerId: string | null;
@@ -39,6 +52,8 @@ export interface SocketState {
   lastRoundRecap: RoundRecap | null;
   nukeAnimation: NukeAnimationData | null;
   cheatNotification: CheatNotification | null;
+  allianceRequest: AllianceRequest | null;
+  allyTroopsNotification: AllyTroopsNotification | null;
 }
 
 export function useSocket() {
@@ -54,6 +69,8 @@ export function useSocket() {
     lastRoundRecap: null,
     nukeAnimation: null,
     cheatNotification: null,
+    allianceRequest: null,
+    allyTroopsNotification: null,
   });
 
   const socket = getSocket();
@@ -99,6 +116,13 @@ export function useSocket() {
     (socket as any).on('game:nuke-animation', (data: NukeAnimationData) => {
       setState(s => ({ ...s, nukeAnimation: data }));
       setTimeout(() => setState(s => ({ ...s, nukeAnimation: null })), 3200);
+    });
+    (socket as any).on('game:alliance-request', (data: AllianceRequest) => {
+      setState(s => ({ ...s, allianceRequest: data }));
+    });
+    (socket as any).on('game:ally-troops', (data: AllyTroopsNotification) => {
+      setState(s => ({ ...s, allyTroopsNotification: data }));
+      setTimeout(() => setState(s => ({ ...s, allyTroopsNotification: null })), 6000);
     });
 
     return () => {
@@ -188,6 +212,19 @@ export function useSocket() {
     (socket as any).emit('game:nuke', targetTerritoryId);
   }
 
+  function proposeAlliance(targetCountryId: string) {
+    (socket as any).emit('game:alliance-propose', { targetCountryId });
+  }
+
+  function respondToAlliance(fromCountryId: string, accept: boolean) {
+    (socket as any).emit('game:alliance-respond', { fromCountryId, accept });
+    setState(s => ({ ...s, allianceRequest: null }));
+  }
+
+  function breakAlliance(targetCountryId: string) {
+    (socket as any).emit('game:break-alliance', { targetCountryId });
+  }
+
   return {
     ...state,
     createLobby,
@@ -203,5 +240,8 @@ export function useSocket() {
     clearCombatQueue,
     dismissRecap,
     launchNuke,
+    proposeAlliance,
+    respondToAlliance,
+    breakAlliance,
   };
 }

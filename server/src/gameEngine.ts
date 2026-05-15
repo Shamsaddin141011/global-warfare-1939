@@ -85,8 +85,8 @@ function processAction(
 
       const isNaval = isNavalAttack(launchPoint, toT);
 
-      if (toT.ownerId === action.countryId) {
-        // Friendly move — troops physically move from source to target along the corridor
+      if (toT.ownerId === action.countryId || country.alliedWith.includes(toT.ownerId)) {
+        // Friendly move — own or allied territory
         const moved = Math.min(d.forceSize, fromT.garrison - 1);
         if (moved <= 0) return;
         fromT.garrison -= moved;

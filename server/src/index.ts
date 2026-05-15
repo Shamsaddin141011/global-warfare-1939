@@ -8,7 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {
   ServerToClientEvents, ClientToServerEvents,
-  PlayerAction, ChatMessage, GameSettings, GameState, GameEvent
+  PlayerAction, MoveAction, ChatMessage, GameSettings, GameState, GameEvent
 } from '../../shared/src/types';
 import * as LobbyService from './lobby';
 import { advanceTurn } from './gameEngine';
@@ -33,6 +33,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 const games = new Map<string, GameState>();
 // Timer per room
 const turnTimers = new Map<string, ReturnType<typeof setInterval>>();
+// playerId → socket.id for targeted messages
+const playerSockets = new Map<string, string>();
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -55,6 +57,7 @@ if (hasBuiltClient) {
 
 io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
   const playerId = uuidv4();
+  playerSockets.set(playerId, socket.id);
   console.log(`Client connected: ${playerId}`);
   socket.emit('connected', playerId);
 
@@ -268,7 +271,95 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     io.to(lobby.roomCode).emit('chat:message', msg);
   });
 
+  (socket as any).on('game:alliance-propose', ({ targetCountryId }: { targetCountryId: string }) => {
+    const lobby = LobbyService.getLobbyForPlayer(playerId);
+    if (!lobby?.gameId) return;
+    const state = games.get(lobby.gameId);
+    if (!state) return;
+    const player = lobby.players[playerId];
+    if (!player?.countryId) return;
+    const fromCountry = state.countries[player.countryId];
+    if (!fromCountry) return;
+
+    const targetPlayerId = Object.entries(lobby.players)
+      .find(([, p]) => p.countryId === targetCountryId)?.[0];
+    const targetSocketId = targetPlayerId ? playerSockets.get(targetPlayerId) : null;
+    if (targetSocketId) {
+      (io as any).to(targetSocketId).emit('game:alliance-request', {
+        fromCountryId: player.countryId,
+        fromCountryName: fromCountry.name,
+        fromCountryFlag: fromCountry.flag,
+      });
+    }
+  });
+
+  (socket as any).on('game:alliance-respond', ({ fromCountryId, accept }: { fromCountryId: string; accept: boolean }) => {
+    const lobby = LobbyService.getLobbyForPlayer(playerId);
+    if (!lobby?.gameId) return;
+    const state = games.get(lobby.gameId);
+    if (!state) return;
+    const player = lobby.players[playerId];
+    if (!player?.countryId) return;
+    const myCountry = state.countries[player.countryId];
+    const fromCountry = state.countries[fromCountryId];
+    if (!myCountry || !fromCountry) return;
+
+    if (accept) {
+      if (!myCountry.alliedWith.includes(fromCountryId)) myCountry.alliedWith.push(fromCountryId);
+      if (!fromCountry.alliedWith.includes(player.countryId)) fromCountry.alliedWith.push(player.countryId);
+      const event: GameEvent = {
+        turn: state.turn,
+        date: `${MONTHS[state.month]} ${state.year}`,
+        type: 'diplomacy',
+        message: `${fromCountry.name} and ${myCountry.name} have formed an alliance!`,
+        involvedCountries: [fromCountryId, player.countryId],
+      };
+      io.to(lobby.roomCode).emit('game:event', event);
+      io.to(lobby.roomCode).emit('game:state', state);
+    } else {
+      const fromPlayerId = Object.entries(lobby.players)
+        .find(([, p]) => p.countryId === fromCountryId)?.[0];
+      const fromSocketId = fromPlayerId ? playerSockets.get(fromPlayerId) : null;
+      if (fromSocketId) {
+        const event: GameEvent = {
+          turn: state.turn,
+          date: `${MONTHS[state.month]} ${state.year}`,
+          type: 'diplomacy',
+          message: `${myCountry.name} declined your alliance proposal.`,
+          involvedCountries: [fromCountryId, player.countryId],
+        };
+        (io as any).to(fromSocketId).emit('game:event', event);
+      }
+    }
+  });
+
+  (socket as any).on('game:break-alliance', ({ targetCountryId }: { targetCountryId: string }) => {
+    const lobby = LobbyService.getLobbyForPlayer(playerId);
+    if (!lobby?.gameId) return;
+    const state = games.get(lobby.gameId);
+    if (!state) return;
+    const player = lobby.players[playerId];
+    if (!player?.countryId) return;
+    const myCountry = state.countries[player.countryId];
+    const targetCountry = state.countries[targetCountryId];
+    if (!myCountry || !targetCountry) return;
+
+    myCountry.alliedWith = myCountry.alliedWith.filter(id => id !== targetCountryId);
+    targetCountry.alliedWith = targetCountry.alliedWith.filter(id => id !== player.countryId);
+
+    const event: GameEvent = {
+      turn: state.turn,
+      date: `${MONTHS[state.month]} ${state.year}`,
+      type: 'diplomacy',
+      message: `${myCountry.name} has broken its alliance with ${targetCountry.name}!`,
+      involvedCountries: [player.countryId, targetCountryId],
+    };
+    io.to(lobby.roomCode).emit('game:event', event);
+    io.to(lobby.roomCode).emit('game:state', state);
+  });
+
   socket.on('disconnect', () => {
+    playerSockets.delete(playerId);
     console.log(`Client disconnected: ${playerId}`);
     const lobby = LobbyService.setPlayerOnline(playerId, false);
     if (lobby) io.to(lobby.roomCode).emit('lobby:updated', lobby);
@@ -296,6 +387,29 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
   const state = games.get(gameId);
   if (!state || state.phase !== 'planning') return;
 
+  const lobby = LobbyService.getLobby(roomCode);
+
+  // Capture ally troop moves before resolution clears pendingActions
+  const allyMoveNotifications = state.pendingActions
+    .filter(action => {
+      if (action.type !== 'move') return false;
+      const d = action.data as MoveAction;
+      const toT = state.territories[d.toTerritoryId];
+      if (!toT || toT.ownerId === action.countryId) return false;
+      return state.countries[action.countryId]?.alliedWith?.includes(toT.ownerId);
+    })
+    .map(action => {
+      const d = action.data as MoveAction;
+      const toT = state.territories[d.toTerritoryId];
+      return {
+        fromCountryName: state.countries[action.countryId]?.name ?? action.countryId,
+        fromCountryId: action.countryId,
+        toCountryId: toT!.ownerId,
+        toTerritoryName: toT!.name,
+        forceSize: d.forceSize,
+      };
+    });
+
   state.phase = 'resolving';
   io.to(roomCode).emit('game:state', state);
 
@@ -306,6 +420,23 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
   }
   for (const event of events) {
     io.to(roomCode).emit('game:event', event);
+  }
+
+  // Notify ally players of incoming troops
+  if (lobby) {
+    for (const n of allyMoveNotifications) {
+      const targetPlayerId = Object.entries(lobby.players)
+        .find(([, p]) => p.countryId === n.toCountryId)?.[0];
+      const targetSocketId = targetPlayerId ? playerSockets.get(targetPlayerId) : null;
+      if (targetSocketId) {
+        (io as any).to(targetSocketId).emit('game:ally-troops', {
+          fromCountryName: n.fromCountryName,
+          fromCountryId: n.fromCountryId,
+          forceSize: n.forceSize,
+          territoryName: n.toTerritoryName,
+        });
+      }
+    }
   }
 
   saveGame(state);
@@ -328,7 +459,6 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
   }
 
   if ((state.phase as string) !== 'ended') {
-    const lobby = LobbyService.getLobby(roomCode);
     startTurnTimer(roomCode, gameId, lobby?.settings.turnTimerSeconds ?? 300);
   }
 }

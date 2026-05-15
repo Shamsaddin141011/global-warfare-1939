@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from '../../shared/src/constants';
 import { WILDERNESS_REGIONS } from '../../shared/src/wildernessData';
 import { PROVINCES, RENAMED_CAPITALS, CAPITAL_STAT_OVERRIDES } from '../../shared/src/provinceData';
 
-const DATA_DIR = path.join(__dirname, '../../../../data');
+const DATA_DIR = path.join(__dirname, '../../data');
 
 interface CountryJson {
   id: string; name: string; fullName: string;

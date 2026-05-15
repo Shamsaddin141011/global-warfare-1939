@@ -13,6 +13,8 @@ import RecapModal from './components/RecapModal';
 import TutorialModal from './components/TutorialModal';
 import CommandBar from './components/CommandBar';
 import AttackModal from './components/AttackModal';
+import CapitalPanel from './components/CapitalPanel';
+import AllianceRequestModal from './components/AllianceRequestModal';
 
 const TAB_KEYS: Record<string, 'country' | 'territory' | 'diplomacy' | 'research' | 'production'> = {
   '1': 'country', '2': 'territory', '3': 'diplomacy', '4': 'research', '5': 'production',
@@ -22,9 +24,10 @@ export default function App() {
   const {
     connected, playerId, lobby, gameState,
     combatQueue, chatMessages, timerSeconds, lastEvents,
-    lastRoundRecap, nukeAnimation, cheatNotification,
+    lastRoundRecap, nukeAnimation, cheatNotification, allianceRequest, allyTroopsNotification,
     createLobby, joinLobby, pickCountry, toggleReady, startGame, quickStart,
     submitActions, forceEndTurn, sendCommand, sendChat, clearCombatQueue, dismissRecap, launchNuke,
+    proposeAlliance, respondToAlliance, breakAlliance,
   } = useSocket();
 
   const myPlayer = playerId && lobby ? lobby.players[playerId] : null;
@@ -45,6 +48,7 @@ export default function App() {
   const [mapMode, setMapMode] = useState<'inspect' | 'attack' | 'move'>('inspect');
   const [attackSource, setAttackSource] = useState<string | null>(null);
   const [attackTarget, setAttackTarget] = useState<string | null>(null);
+  const [capitalPanel, setCapitalPanel] = useState<string | null>(null);
 
   function setMode(next: 'inspect' | 'attack' | 'move') {
     setMapMode(prev => {
@@ -64,13 +68,24 @@ export default function App() {
       setNukingMode(false);
       return;
     }
-    if (mapMode === 'inspect') {
-      handleTerritoryClick(territoryId, gameState);
-      return;
-    }
+
     const t = gameState.territories[territoryId];
     if (!t) return;
     const isOwn = t.ownerId === myCountryId;
+    const isAllied = !!(myCountryId && gameState.countries[myCountryId]?.alliedWith?.includes(t.ownerId));
+    const ownerCountry = gameState.countries[t.ownerId];
+    const isCapital = ownerCountry?.capital === territoryId;
+
+    // In inspect mode: show capital panel for other countries' capitals
+    if (mapMode === 'inspect') {
+      if (isCapital && !isOwn && myCountryId) {
+        setCapitalPanel(territoryId);
+      } else {
+        setCapitalPanel(null);
+      }
+      handleTerritoryClick(territoryId, gameState);
+      return;
+    }
 
     // Source must be one of yours
     if (!attackSource) {
@@ -84,7 +99,6 @@ export default function App() {
     // Already have source — interpret this click as target
     if (mapMode === 'attack') {
       if (isOwn) {
-        // re-select source
         setAttackSource(territoryId);
         setAttackTarget(null);
       } else {
@@ -92,16 +106,16 @@ export default function App() {
       }
     } else if (mapMode === 'move') {
       if (isOwn) {
-        // Same source clicked again? re-select source. Otherwise set target.
         if (territoryId === attackSource) {
-          // toggle off
           setAttackSource(null);
           setAttackTarget(null);
         } else {
           setAttackTarget(territoryId);
         }
+      } else if (isAllied) {
+        // Allow sending troops to allied territory
+        setAttackTarget(territoryId);
       }
-      // ignore clicks on enemy territories in move mode
     }
   }
 
@@ -382,6 +396,64 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {capitalPanel && gameState && myCountryId && (
+          <CapitalPanel
+            gameState={gameState}
+            myCountryId={myCountryId}
+            capitalTerritoryId={capitalPanel}
+            onPropose={proposeAlliance}
+            onBreak={breakAlliance}
+            onClose={() => setCapitalPanel(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {allianceRequest && (
+          <AllianceRequestModal
+            request={allianceRequest}
+            onAccept={() => respondToAlliance(allianceRequest.fromCountryId, true)}
+            onDecline={() => respondToAlliance(allianceRequest.fromCountryId, false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {allyTroopsNotification && (
+          <motion.div
+            key="ally-troops-notif"
+            initial={{ opacity: 0, x: 60 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 60 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className="fixed bottom-24 right-4 z-50 w-72 bg-gray-950 border border-green-700 rounded-xl shadow-2xl p-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="bg-green-900 rounded-full p-2 shrink-0">
+                <span className="text-lg">🤝</span>
+              </div>
+              <div>
+                <div className="text-green-400 font-bold text-xs uppercase tracking-wider mb-0.5">Allied Reinforcements</div>
+                <div className="text-white text-sm">
+                  <span className="font-semibold text-green-300">{allyTroopsNotification.fromCountryName}</span> sent{' '}
+                  <span className="font-bold text-yellow-300">{allyTroopsNotification.forceSize} troops</span> to your{' '}
+                  <span className="font-semibold">{allyTroopsNotification.territoryName}</span> province!
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 h-0.5 bg-green-900 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-green-500"
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: 6, ease: 'linear' }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Mode banner */}
       {mapMode !== 'inspect' && inGame && (
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full text-xs shadow-lg pointer-events-none border ${
@@ -394,7 +466,7 @@ export default function App() {
             ? 'click YOUR territory to set source'
             : mapMode === 'attack'
               ? 'click an enemy/neutral territory'
-              : 'click ANOTHER of your territories'}
+              : 'click your territory or an ally\'s territory'}
         </div>
       )}
     </div>

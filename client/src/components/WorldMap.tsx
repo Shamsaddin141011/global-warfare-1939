@@ -430,6 +430,7 @@ const WorldMap: React.FC<Props> = ({
                         const isSelected = c.provinceId === selectedTerritoryId;
                         const isTarget = c.provinceId === targetTerritoryId;
                         const isHover = c.provinceId === hoveredId;
+                        const isAllied = !!(myCountryId && c.ownerId !== myCountryId && gameState?.countries[myCountryId]?.alliedWith?.includes(c.ownerId));
                         return (
                           <path
                             key={c.provinceId}
@@ -441,8 +442,8 @@ const WorldMap: React.FC<Props> = ({
                               isHover    ? 0.85 :
                               v.mixed    ? 0.80 : 0.55
                             }
-                            stroke={isSelected ? '#f0e080' : isTarget ? '#ff5050' : '#000'}
-                            strokeWidth={isSelected || isTarget ? 2.5 : 1.5}
+                            stroke={isSelected ? '#f0e080' : isTarget ? '#ff5050' : isAllied ? '#39ff14' : '#000'}
+                            strokeWidth={isSelected || isTarget ? 2.5 : isAllied ? 2.5 : 1.5}
                             strokeOpacity={0.85}
                             vectorEffect="non-scaling-stroke"
                             style={{ cursor: 'pointer', transition: 'fill-opacity 0.12s ease' }}
