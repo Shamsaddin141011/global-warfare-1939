@@ -80,6 +80,7 @@ export interface SocketState {
   allianceRequest: AllianceRequest | null;
   allyTroopsNotification: AllyTroopsNotification | null;
   isRejoining: boolean;
+  overflowNotification: string | null;
 }
 
 export function useSocket() {
@@ -98,6 +99,7 @@ export function useSocket() {
     allianceRequest: null,
     allyTroopsNotification: null,
     isRejoining: !!getSavedSession(),
+    overflowNotification: null,
   });
 
   const socket = getSocket();
@@ -207,6 +209,10 @@ export function useSocket() {
     (socket as any).on('game:ally-troops', (data: AllyTroopsNotification) => {
       setState(s => ({ ...s, allyTroopsNotification: data }));
       setTimeout(() => setState(s => ({ ...s, allyTroopsNotification: null })), 6000);
+    });
+    (socket as any).on('game:overflow', ({ message }: { message: string }) => {
+      setState(s => ({ ...s, overflowNotification: message }));
+      setTimeout(() => setState(s => ({ ...s, overflowNotification: null })), 7000);
     });
     (socket as any).on('player:kicked', () => {
       clearSession();

@@ -509,6 +509,16 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
   }
   for (const event of events) {
     io.to(roomCode).emit('game:event', event);
+    // Overflow events: also send a targeted popup to the affected player
+    if (event.type === 'overflow' && lobby && event.involvedCountries[0]) {
+      const affectedCountryId = event.involvedCountries[0];
+      const targetPlayerId = Object.entries(lobby.players)
+        .find(([, p]) => p.countryId === affectedCountryId)?.[0];
+      const targetSocketId = targetPlayerId ? playerSockets.get(targetPlayerId) : null;
+      if (targetSocketId) {
+        (io as any).to(targetSocketId).emit('game:overflow', { message: event.message });
+      }
+    }
   }
 
   // Notify ally players of incoming troops

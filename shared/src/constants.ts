@@ -1,3 +1,5 @@
+export const GARRISON_CAP = 30;
+
 export const TERRAIN_MULTIPLIERS: Record<string, number> = {
   plains: 1.0,
   forest: 1.15,

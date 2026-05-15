@@ -2,7 +2,7 @@ import { GameState, PlayerAction, MoveAction, ReinforceAction, BuildAction, Rese
 import { resolveCombat } from '../../shared/src/combat';
 import { tickEconomy } from '../../shared/src/economy';
 import { generateAIActions } from '../../shared/src/aiLogic';
-import { RESEARCH_CATEGORIES, productionCap } from '../../shared/src/constants';
+import { RESEARCH_CATEGORIES, productionCap, GARRISON_CAP } from '../../shared/src/constants';
 import { findCorridor, buildAttackOption, isNavalAttack } from '../../shared/src/routing';
 
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -30,7 +30,7 @@ export function advanceTurn(state: GameState): { combatResults: CombatResult[]; 
   }
 
   // Economy tick
-  tickEconomy(state);
+  tickEconomy(state, events);
 
   // Advance date
   state.month += 1;
@@ -86,8 +86,9 @@ function processAction(
       const isNaval = isNavalAttack(launchPoint, toT);
 
       if (toT.ownerId === action.countryId || country.alliedWith.includes(toT.ownerId)) {
-        // Friendly move — own or allied territory
-        const moved = Math.min(d.forceSize, fromT.garrison - 1);
+        // Friendly move — own or allied territory; destination capped at GARRISON_CAP
+        const space = Math.max(0, GARRISON_CAP - toT.garrison);
+        const moved = Math.min(d.forceSize, fromT.garrison - 1, space);
         if (moved <= 0) return;
         fromT.garrison -= moved;
         toT.garrison += moved;
@@ -124,7 +125,7 @@ function processAction(
       defCountry.army = Math.max(0, defCountry.army - result.defenderLosses);
 
       if (result.captured) {
-        const remainingForce = Math.max(1, force - result.attackerLosses);
+        const remainingForce = Math.min(GARRISON_CAP, Math.max(1, force - result.attackerLosses));
         fromT.garrison -= (force - result.attackerLosses);
         toT.garrison = remainingForce;
         toT.ownerId = action.countryId;
@@ -170,8 +171,28 @@ function processAction(
       country.money           -= added * MONEY_PER;
       country.manpower        -= added * MANPOWER_PER;
 
-      t.garrison    += added;
-      country.army  += added;
+      const space = Math.max(0, GARRISON_CAP - t.garrison);
+      const fits = Math.min(added, space);
+      const overflow = added - fits;
+      t.garrison   += fits;
+      country.army += added;
+
+      if (overflow > 0) {
+        // Overflow reinforcements to adjacent owned territory
+        const adj = t.adjacentTo
+          .map(id => state.territories[id])
+          .filter(a => a && a.ownerId === country.id && a.garrison < GARRISON_CAP)[0];
+        if (adj) {
+          adj.garrison += Math.min(overflow, GARRISON_CAP - adj.garrison);
+        }
+        events.push({
+          turn: state.turn,
+          date: `${MONTHS[state.month]} ${state.year}`,
+          type: 'overflow',
+          message: `${overflow} reinforcement${overflow !== 1 ? 's' : ''} in ${t.name} moved to ${adj?.name ?? 'nearby province'} — province at capacity (${GARRISON_CAP}).`,
+          involvedCountries: [country.id],
+        });
+      }
       break;
     }
 

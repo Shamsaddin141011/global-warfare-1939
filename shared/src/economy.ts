@@ -1,6 +1,10 @@
-import { GameState, CountryStats, TerritoryState, Resources } from './types';
+import { GameState, CountryStats, TerritoryState, Resources, GameEvent } from './types';
+import { GARRISON_CAP } from './constants';
 
-export function tickEconomy(state: GameState): void {
+const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+export function tickEconomy(state: GameState, events: GameEvent[]): void {
   for (const country of Object.values(state.countries)) {
     const ownedTerritories = country.territories.map(id => state.territories[id]).filter(Boolean);
 
@@ -48,14 +52,34 @@ export function tickEconomy(state: GameState): void {
     }
 
     // Process production queue
-    tickProduction(country, state);
+    tickProduction(country, state, events);
   }
 
   // Update supply levels
   updateSupply(state);
 }
 
-function tickProduction(country: CountryStats, state: GameState): void {
+function distributeOverflow(country: CountryStats, state: GameState, source: TerritoryState, overflow: number): string {
+  const adjacent = source.adjacentTo
+    .map(id => state.territories[id])
+    .filter((t): t is TerritoryState => !!(t && t.ownerId === country.id && t.garrison < GARRISON_CAP));
+
+  let remaining = overflow;
+  const destinations: string[] = [];
+
+  for (const adj of adjacent) {
+    if (remaining <= 0) break;
+    const space = GARRISON_CAP - adj.garrison;
+    const added = Math.min(remaining, space);
+    adj.garrison += added;
+    remaining -= added;
+    if (!destinations.includes(adj.name)) destinations.push(adj.name);
+  }
+
+  return destinations.length > 0 ? destinations.join(', ') : 'nearby provinces';
+}
+
+function tickProduction(country: CountryStats, state: GameState, events: GameEvent[]): void {
   const queue = country.productionQueue;
   if (queue.length === 0) return;
 
@@ -63,7 +87,7 @@ function tickProduction(country: CountryStats, state: GameState): void {
   item.turnsLeft -= 1;
 
   if (item.turnsLeft <= 0) {
-    // Resolve spawn territory: prefer the queued target; if lost, use capital; if that's lost too, fallback to any owned territory.
+    // Resolve spawn territory
     let target = item.targetTerritoryId ? state.territories[item.targetTerritoryId] : undefined;
     if (!target || target.ownerId !== country.id) {
       target = state.territories[country.capital];
@@ -73,14 +97,26 @@ function tickProduction(country: CountryStats, state: GameState): void {
     }
 
     switch (item.type) {
-      case 'infantry': {
-        country.army += item.quantity;
-        if (target) target.garrison += item.quantity;
-        break;
-      }
+      case 'infantry':
       case 'armor': {
         country.army += item.quantity;
-        if (target) target.garrison += item.quantity;
+        if (target) {
+          const space = Math.max(0, GARRISON_CAP - target.garrison);
+          const fits = Math.min(item.quantity, space);
+          const overflow = item.quantity - fits;
+          target.garrison += fits;
+
+          if (overflow > 0) {
+            const movedTo = distributeOverflow(country, state, target, overflow);
+            events.push({
+              turn: state.turn,
+              date: `${MONTHS[state.month]} ${state.year}`,
+              type: 'overflow',
+              message: `${overflow} division${overflow !== 1 ? 's' : ''} produced in ${target.name} moved to ${movedTo} — province at capacity (${GARRISON_CAP}).`,
+              involvedCountries: [country.id],
+            });
+          }
+        }
         break;
       }
       case 'aircraft': country.airPower += item.quantity; break;

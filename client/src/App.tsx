@@ -25,7 +25,7 @@ export default function App() {
     connected, playerId, lobby, gameState,
     combatQueue, chatMessages, timerSeconds, lastEvents,
     lastRoundRecap, nukeAnimation, cheatNotification, allianceRequest, allyTroopsNotification,
-    isRejoining,
+    isRejoining, overflowNotification,
     createLobby, joinLobby, pickCountry, toggleReady, startGame, quickStart,
     submitActions, forceEndTurn, sendCommand, sendChat, clearCombatQueue, dismissRecap, launchNuke,
     proposeAlliance, respondToAlliance, breakAlliance, leaveGame, kickPlayer,
@@ -469,6 +469,37 @@ export default function App() {
                 initial={{ width: '100%' }}
                 animate={{ width: '0%' }}
                 transition={{ duration: 6, ease: 'linear' }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {overflowNotification && (
+          <motion.div
+            key="overflow-notif"
+            initial={{ opacity: 0, x: 60 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 60 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className="fixed bottom-40 right-4 z-50 w-72 bg-gray-950 border border-yellow-700 rounded-xl shadow-2xl p-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="bg-yellow-900 rounded-full p-2 shrink-0">
+                <span className="text-lg">⚠️</span>
+              </div>
+              <div>
+                <div className="text-yellow-400 font-bold text-xs uppercase tracking-wider mb-0.5">Province at Capacity</div>
+                <div className="text-white text-sm">{overflowNotification}</div>
+              </div>
+            </div>
+            <div className="mt-2 h-0.5 bg-yellow-900 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-yellow-500"
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: 7, ease: 'linear' }}
               />
             </div>
           </motion.div>

@@ -137,7 +137,7 @@ export interface CombatResult {
 export interface GameEvent {
   turn: number;
   date: string;
-  type: 'combat' | 'diplomacy' | 'research' | 'production' | 'ai' | 'narration' | 'nuke';
+  type: 'combat' | 'diplomacy' | 'research' | 'production' | 'ai' | 'narration' | 'nuke' | 'overflow';
   message: string;
   involvedCountries: string[];
 }
