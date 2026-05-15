@@ -18,6 +18,7 @@ const EVENT_ICON: Record<GameEvent['type'], React.ReactNode> = {
   ai:         <Megaphone size={12} className="text-gray-400" />,
   narration:  <ScrollText size={12} className="text-amber-400" />,
   nuke:       <span style={{ fontSize: 12 }}>☢</span>,
+  overflow:   <span style={{ fontSize: 12 }}>⚠️</span>,
 };
 
 const RecapModal: React.FC<Props> = ({ recap, gameState, onDismiss }) => {
