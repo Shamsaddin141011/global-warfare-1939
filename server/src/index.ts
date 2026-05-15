@@ -201,6 +201,36 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     console.log(`Player ${playerId} rejoined game ${gameId} as ${countryId}`);
   });
 
+  (socket as any).on('lobby:rejoin', ({ roomCode, countryId, username, isHost }: { roomCode: string; countryId: string | null; username: string; isHost: boolean }) => {
+    const lobby = LobbyService.getLobby(roomCode);
+    if (!lobby) { (socket as any).emit('lobby:rejoin-failed'); return; }
+
+    // If game already started while this player was disconnected, redirect to game rejoin
+    if (lobby.status === 'in_game' && lobby.gameId && countryId) {
+      const state = games.get(lobby.gameId);
+      if (state && state.countries[countryId]?.isHuman) {
+        LobbyService.registerRejoinedPlayer(playerId, countryId, roomCode);
+        playerSockets.set(playerId, socket.id);
+        socket.join(roomCode);
+        const updatedLobby = LobbyService.getLobby(roomCode)!;
+        socket.emit('game:state', state);
+        (socket as any).emit('game:rejoin-ok', { countryId, lobby: updatedLobby });
+        io.to(roomCode).emit('lobby:updated', updatedLobby);
+        return;
+      }
+      (socket as any).emit('lobby:rejoin-failed');
+      return;
+    }
+
+    const updatedLobby = LobbyService.rejoinLobby(playerId, roomCode, countryId, username, isHost);
+    if (!updatedLobby) { (socket as any).emit('lobby:rejoin-failed'); return; }
+
+    socket.join(roomCode);
+    (socket as any).emit('lobby:rejoin-ok', updatedLobby);
+    io.to(roomCode).emit('lobby:updated', updatedLobby);
+    console.log(`Player ${playerId} rejoined lobby ${roomCode} as ${countryId}`);
+  });
+
   socket.on('game:command', ({ reqId, text }) => {
     const reply = (ok: boolean, message: string, action?: any) => {
       socket.emit('game:command:result', { reqId, ok, message, action });

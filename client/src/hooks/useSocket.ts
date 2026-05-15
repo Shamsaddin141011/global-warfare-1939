@@ -10,15 +10,23 @@ const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
 
 const SESSION_KEY = 'gw1939_session';
 
-function saveSession(gameId: string, countryId: string, roomCode: string, username: string) {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ gameId, countryId, roomCode, username })); } catch {}
+interface Session {
+  roomCode: string;
+  username: string;
+  countryId: string | null;
+  gameId: string | null;
+  isHost?: boolean;
+}
+
+function saveSession(s: Session) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
 }
 
 function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch {}
 }
 
-function getSavedSession(): { gameId: string; countryId: string; roomCode: string; username: string } | null {
+function getSavedSession(): Session | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -103,11 +111,19 @@ export function useSocket() {
     socket.on('connected', (id) => {
       setState(s => ({ ...s, playerId: id }));
       const session = getSavedSession();
-      if (session) {
+      if (!session) return;
+      if (session.gameId && session.countryId) {
         (socket as any).emit('game:rejoin', {
           gameId: session.gameId,
           countryId: session.countryId,
           roomCode: session.roomCode,
+        });
+      } else if (session.roomCode) {
+        (socket as any).emit('lobby:rejoin', {
+          roomCode: session.roomCode,
+          countryId: session.countryId,
+          username: session.username,
+          isHost: session.isHost ?? false,
         });
       }
     });
@@ -118,13 +134,38 @@ export function useSocket() {
       clearSession();
       setState(s => ({ ...s, isRejoining: false }));
     });
-    socket.on('lobby:updated', (lobby) => setState(s => ({ ...s, lobby })));
+    (socket as any).on('lobby:rejoin-ok', (lobby: Lobby) => {
+      setState(s => ({ ...s, isRejoining: false, lobby }));
+    });
+    (socket as any).on('lobby:rejoin-failed', () => {
+      clearSession();
+      setState(s => ({ ...s, isRejoining: false }));
+    });
+    socket.on('lobby:updated', (lobby) => setState(s => {
+      const myPlayer = s.playerId ? lobby.players[s.playerId] : null;
+      if (myPlayer) {
+        saveSession({
+          roomCode: lobby.roomCode,
+          username: myPlayer.username || '',
+          countryId: myPlayer.countryId || null,
+          gameId: lobby.gameId || null,
+          isHost: myPlayer.isHost,
+        });
+      }
+      return { ...s, lobby };
+    }));
     socket.on('game:state', (gs) => setState(s => {
       // Persist session so refresh/reconnect works
       if (s.lobby && s.playerId) {
         const myPlayer = s.lobby.players[s.playerId];
         if (myPlayer?.countryId) {
-          saveSession(gs.id, myPlayer.countryId, gs.roomCode, myPlayer.username ?? '');
+          saveSession({
+            gameId: gs.id,
+            countryId: myPlayer.countryId,
+            roomCode: gs.roomCode,
+            username: myPlayer.username || '',
+            isHost: myPlayer.isHost,
+          });
         }
       }
       const buf = roundBufferRef.current;

@@ -108,6 +108,37 @@ export function setPlayerOnline(playerId: string, online: boolean): Lobby | null
   return lobby;
 }
 
+export function rejoinLobby(playerId: string, roomCode: string, countryId: string | null, username: string, restoreHost: boolean): Lobby | null {
+  const lobby = getLobby(roomCode);
+  if (!lobby || lobby.status === 'in_game') return null;
+
+  // Remove stale entry for this countryId from other playerIds
+  if (countryId) {
+    for (const [pid, p] of Object.entries(lobby.players)) {
+      if (p.countryId === countryId && pid !== playerId) {
+        delete lobby.players[pid];
+        playerToRoom.delete(pid);
+        if (!lobby.availableCountries.includes(countryId)) lobby.availableCountries.push(countryId);
+      }
+    }
+    lobby.availableCountries = lobby.availableCountries.filter(c => c !== countryId);
+  }
+
+  if (restoreHost && lobby.players[lobby.hostId]) {
+    lobby.players[lobby.hostId].isHost = false;
+    lobby.hostId = playerId;
+  }
+
+  lobby.players[playerId] = {
+    id: playerId, username,
+    countryId: countryId || null,
+    isHost: restoreHost,
+    isReady: false, isSpectator: false, isOnline: true, submittedTurn: false,
+  };
+  playerToRoom.set(playerId, roomCode);
+  return lobby;
+}
+
 export function rebuildLobbyFromGame(gameState: GameState): Lobby {
   const humanCountries = Object.values(gameState.countries).filter(c => c.isHuman);
   const players: Record<string, Player> = {};
