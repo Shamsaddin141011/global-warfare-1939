@@ -13,7 +13,7 @@ import {
 import * as LobbyService from './lobby';
 import { advanceTurn } from './gameEngine';
 import { buildInitialGameState } from './seed';
-import { saveGame } from './db';
+import { saveGame, loadAllGames } from './db';
 import { generateNarration } from './narration';
 import { interpretCommand } from './commandInterpreter';
 
@@ -35,6 +35,17 @@ const games = new Map<string, GameState>();
 const turnTimers = new Map<string, ReturnType<typeof setInterval>>();
 // playerId → socket.id for targeted messages
 const playerSockets = new Map<string, string>();
+
+// Restore saved games on startup so players can rejoin after server restart
+for (const gs of loadAllGames()) {
+  if (gs.phase === 'ended') continue;
+  gs.submittedPlayers = [];
+  gs.pendingActions = [];
+  games.set(gs.id, gs);
+  LobbyService.rebuildLobbyFromGame(gs);
+  startTurnTimer(gs.roomCode, gs.id, gs.turnTimerSeconds);
+  console.log(`Restored game ${gs.id} (room ${gs.roomCode}), turn ${gs.turn}`);
+}
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -153,9 +164,11 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     if (!lobby?.gameId) return;
     const state = games.get(lobby.gameId);
     if (!state || state.phase !== 'planning') return;
+    const player = lobby.players[playerId];
+    if (!player?.countryId) return;
 
-    if (!state.submittedPlayers.includes(playerId)) {
-      state.submittedPlayers.push(playerId);
+    if (!state.submittedPlayers.includes(player.countryId)) {
+      state.submittedPlayers.push(player.countryId);
       state.pendingActions.push(...actions);
     }
 
@@ -165,6 +178,27 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>)
     if (state.submittedPlayers.length >= humanCountries.length) {
       resolveTurn(lobby.roomCode, lobby.gameId);
     }
+  });
+
+  (socket as any).on('game:rejoin', ({ gameId, countryId, roomCode }: { gameId: string; countryId: string; roomCode: string }) => {
+    const state = games.get(gameId);
+    if (!state || !state.countries[countryId]?.isHuman) {
+      (socket as any).emit('game:rejoin-failed');
+      return;
+    }
+
+    let lobby = LobbyService.getLobby(roomCode);
+    if (!lobby) lobby = LobbyService.rebuildLobbyFromGame(state);
+
+    LobbyService.registerRejoinedPlayer(playerId, countryId, roomCode);
+    playerSockets.set(playerId, socket.id);
+    socket.join(roomCode);
+
+    const updatedLobby = LobbyService.getLobby(roomCode)!;
+    socket.emit('game:state', state);
+    (socket as any).emit('game:rejoin-ok', { countryId, lobby: updatedLobby });
+    io.to(roomCode).emit('lobby:updated', updatedLobby);
+    console.log(`Player ${playerId} rejoined game ${gameId} as ${countryId}`);
   });
 
   socket.on('game:command', ({ reqId, text }) => {

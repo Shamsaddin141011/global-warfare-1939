@@ -1,4 +1,4 @@
-import { Lobby, Player, GameSettings } from '../../shared/src/types';
+import { Lobby, Player, GameSettings, GameState } from '../../shared/src/types';
 import { DEFAULT_SETTINGS, MAJOR_POWERS } from '../../shared/src/constants';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -105,6 +105,69 @@ export function setPlayerOnline(playerId: string, online: boolean): Lobby | null
   const lobby = getLobbyForPlayer(playerId);
   if (!lobby || !lobby.players[playerId]) return null;
   lobby.players[playerId].isOnline = online;
+  return lobby;
+}
+
+export function rebuildLobbyFromGame(gameState: GameState): Lobby {
+  const humanCountries = Object.values(gameState.countries).filter(c => c.isHuman);
+  const players: Record<string, Player> = {};
+  for (const c of humanCountries) {
+    const pid = `pending:${c.id}`;
+    players[pid] = {
+      id: pid, username: c.name, countryId: c.id,
+      isHost: false, isReady: true, isSpectator: false, isOnline: false, submittedTurn: false,
+    };
+  }
+  const firstPid = Object.keys(players)[0] ?? 'unknown';
+  if (players[firstPid]) players[firstPid].isHost = true;
+
+  const settings: GameSettings = {
+    maxPlayers: humanCountries.length || 1,
+    turnMode: gameState.turnMode,
+    turnTimerSeconds: gameState.turnTimerSeconds,
+    aiDifficulty: DEFAULT_SETTINGS.aiDifficulty,
+    fogOfWar: gameState.fogOfWar,
+    victoryCondition: gameState.victoryCondition,
+  };
+
+  const lobby: Lobby = {
+    roomCode: gameState.roomCode,
+    hostId: firstPid,
+    players,
+    settings,
+    status: 'in_game',
+    gameId: gameState.id,
+    availableCountries: [],
+  };
+  lobbies.set(gameState.roomCode, lobby);
+  // No playerToRoom entries yet — filled when players rejoin
+  return lobby;
+}
+
+export function registerRejoinedPlayer(playerId: string, countryId: string, roomCode: string): Lobby | null {
+  const lobby = getLobby(roomCode);
+  if (!lobby) return null;
+
+  // Remove placeholder for this countryId
+  delete lobby.players[`pending:${countryId}`];
+  if (lobby.hostId === `pending:${countryId}`) lobby.hostId = playerId;
+
+  // Remove any stale real-player entry for this countryId (e.g. previous rejoin)
+  for (const [pid, p] of Object.entries(lobby.players)) {
+    if (p.countryId === countryId && pid !== playerId) {
+      delete lobby.players[pid];
+      playerToRoom.delete(pid);
+    }
+  }
+
+  lobby.players[playerId] = {
+    id: playerId,
+    username: lobby.players[playerId]?.username ?? countryId,
+    countryId,
+    isHost: lobby.hostId === playerId,
+    isReady: true, isSpectator: false, isOnline: true, submittedTurn: false,
+  };
+  playerToRoom.set(playerId, roomCode);
   return lobby;
 }
 

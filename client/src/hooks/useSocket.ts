@@ -8,6 +8,23 @@ import { v4 as uuidv4 } from 'uuid';
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
+const SESSION_KEY = 'gw1939_session';
+
+function saveSession(gameId: string, countryId: string, roomCode: string, username: string) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ gameId, countryId, roomCode, username })); } catch {}
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+
+function getSavedSession(): { gameId: string; countryId: string; roomCode: string; username: string } | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export interface RoundRecap {
   turn: number;
   date: string;
@@ -54,6 +71,7 @@ export interface SocketState {
   cheatNotification: CheatNotification | null;
   allianceRequest: AllianceRequest | null;
   allyTroopsNotification: AllyTroopsNotification | null;
+  isRejoining: boolean;
 }
 
 export function useSocket() {
@@ -71,6 +89,7 @@ export function useSocket() {
     cheatNotification: null,
     allianceRequest: null,
     allyTroopsNotification: null,
+    isRejoining: !!getSavedSession(),
   });
 
   const socket = getSocket();
@@ -80,10 +99,34 @@ export function useSocket() {
 
   useEffect(() => {
     socket.on('connect', () => setState(s => ({ ...s, connected: true })));
-    socket.on('disconnect', () => setState(s => ({ ...s, connected: false })));
-    socket.on('connected', (id) => setState(s => ({ ...s, playerId: id })));
+    socket.on('disconnect', () => setState(s => ({ ...s, connected: false, isRejoining: !!getSavedSession() })));
+    socket.on('connected', (id) => {
+      setState(s => ({ ...s, playerId: id }));
+      const session = getSavedSession();
+      if (session) {
+        (socket as any).emit('game:rejoin', {
+          gameId: session.gameId,
+          countryId: session.countryId,
+          roomCode: session.roomCode,
+        });
+      }
+    });
+    (socket as any).on('game:rejoin-ok', ({ countryId: _c, lobby }: { countryId: string; lobby: Lobby }) => {
+      setState(s => ({ ...s, isRejoining: false, lobby }));
+    });
+    (socket as any).on('game:rejoin-failed', () => {
+      clearSession();
+      setState(s => ({ ...s, isRejoining: false }));
+    });
     socket.on('lobby:updated', (lobby) => setState(s => ({ ...s, lobby })));
     socket.on('game:state', (gs) => setState(s => {
+      // Persist session so refresh/reconnect works
+      if (s.lobby && s.playerId) {
+        const myPlayer = s.lobby.players[s.playerId];
+        if (myPlayer?.countryId) {
+          saveSession(gs.id, myPlayer.countryId, gs.roomCode, myPlayer.username ?? '');
+        }
+      }
       const buf = roundBufferRef.current;
       let lastRoundRecap = s.lastRoundRecap;
       if (buf.lastTurn < 0) {
@@ -225,6 +268,11 @@ export function useSocket() {
     (socket as any).emit('game:break-alliance', { targetCountryId });
   }
 
+  function leaveGame() {
+    clearSession();
+    setState(s => ({ ...s, gameState: null, lobby: null, isRejoining: false }));
+  }
+
   return {
     ...state,
     createLobby,
@@ -243,5 +291,6 @@ export function useSocket() {
     proposeAlliance,
     respondToAlliance,
     breakAlliance,
+    leaveGame,
   };
 }

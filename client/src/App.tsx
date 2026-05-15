@@ -25,9 +25,10 @@ export default function App() {
     connected, playerId, lobby, gameState,
     combatQueue, chatMessages, timerSeconds, lastEvents,
     lastRoundRecap, nukeAnimation, cheatNotification, allianceRequest, allyTroopsNotification,
+    isRejoining,
     createLobby, joinLobby, pickCountry, toggleReady, startGame, quickStart,
     submitActions, forceEndTurn, sendCommand, sendChat, clearCombatQueue, dismissRecap, launchNuke,
-    proposeAlliance, respondToAlliance, breakAlliance,
+    proposeAlliance, respondToAlliance, breakAlliance, leaveGame,
   } = useSocket();
 
   const myPlayer = playerId && lobby ? lobby.players[playerId] : null;
@@ -143,7 +144,7 @@ export default function App() {
     }
   }, [gameState?.id]);
 
-  const submitted = gameState?.submittedPlayers.includes(playerId ?? '') ?? false;
+  const submitted = !!(myCountryId && gameState?.submittedPlayers.includes(myCountryId));
 
   function onEndTurn() {
     submitActions(pendingActions as any);
@@ -165,6 +166,22 @@ export default function App() {
   }, [gameState]);
 
   const inGame = gameState !== null;
+
+  if (isRejoining) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-white gap-4">
+        <div className="text-4xl animate-pulse">⚔</div>
+        <div className="text-xl font-bold text-yellow-300">Reconnecting to game...</div>
+        <div className="text-gray-400 text-sm">Restoring your session</div>
+        <button
+          onClick={leaveGame}
+          className="mt-6 text-xs text-gray-500 hover:text-gray-300 underline"
+        >
+          Cancel and return to menu
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
