@@ -8,7 +8,20 @@ import { formatManpower } from '../lib/mapColors';
 import { Delaunay } from 'd3-delaunay';
 import { geoMercator, geoPath } from 'd3-geo';
 
-const MAJOR_COUNTRIES = ['germany', 'ussr', 'france', 'uk', 'italy', 'japan', 'usa', 'china'] as const;
+const MAJOR_COUNTRIES = [
+  // original 8 majors
+  'germany', 'ussr', 'france', 'uk', 'italy', 'japan', 'usa', 'china',
+  // Europe
+  'poland', 'romania', 'hungary', 'yugoslavia', 'finland', 'greece', 'turkey',
+  'spain', 'norway', 'sweden', 'denmark', 'netherlands', 'belgium', 'bulgaria', 'portugal',
+  // Middle East / Africa
+  'iran', 'iraq', 'egypt', 'saudi-arabia', 'india', 'algeria', 'libya',
+  'ethiopia', 'morocco', 'south-africa',
+  // Asia
+  'korea', 'manchuria', 'burma', 'vietnam', 'thailand', 'indonesia',
+  // Americas / Pacific
+  'canada', 'brazil', 'mexico', 'argentina', 'australia',
+] as const;
 const MAP_PROJECTION = geoMercator().scale(220).translate([400, 300]);
 const MAP_PATH_GEN = geoPath(MAP_PROJECTION as any);
 
@@ -37,7 +50,13 @@ const ISO_TO_TERRITORY: Record<string, string> = {
   '795': 'ussr', // Turkmenistan (Turkmen SSR)
   '860': 'ussr', // Uzbekistan (Uzbek SSR)
   '417': 'ussr', // Kyrgyzstan (Kirghiz SSR)
-  '392': 'japan', '410': 'korea', '408': 'manchuria',
+  // Yugoslavia successor states — all map to the historical Yugoslavia territory
+  '191': 'yugoslavia', // Croatia
+  '705': 'yugoslavia', // Slovenia
+  '70':  'yugoslavia', // Bosnia & Herzegovina
+  '807': 'yugoslavia', // North Macedonia
+  '499': 'yugoslavia', // Montenegro
+  '392': 'japan', '410': 'korea', '408': 'korea', // both halves of Korea → single territory
   '158': 'china-north', '156': 'china',
   '496': 'mongolia', '764': 'thailand', '704': 'vietnam',
   '458': 'malaysia', '360': 'indonesia', '608': 'philippines',
