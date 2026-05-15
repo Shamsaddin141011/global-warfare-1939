@@ -5,7 +5,17 @@ import { DEFAULT_SETTINGS } from '../../shared/src/constants';
 import { WILDERNESS_REGIONS } from '../../shared/src/wildernessData';
 import { PROVINCES, RENAMED_CAPITALS, CAPITAL_STAT_OVERRIDES } from '../../shared/src/provinceData';
 
-const DATA_DIR = path.join(__dirname, '../../data');
+// Walk up from __dirname to find data/ — works in both tsx (dev) and compiled (prod)
+function findDataDir(start: string): string {
+  let dir = start;
+  for (let i = 0; i < 8; i++) {
+    const candidate = path.join(dir, 'data');
+    if (fs.existsSync(path.join(candidate, 'countries.json'))) return candidate;
+    dir = path.dirname(dir);
+  }
+  throw new Error(`Cannot locate data/ directory (searched from ${start})`);
+}
+const DATA_DIR = findDataDir(__dirname);
 
 interface CountryJson {
   id: string; name: string; fullName: string;
