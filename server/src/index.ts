@@ -463,7 +463,7 @@ async function resolveTurn(roomCode: string, gameId: string): Promise<void> {
   }
 }
 
-const PORT = process.env.PORT ?? 3001;
+const PORT = Number(process.env.PORT ?? 3001);
 httpServer.listen(PORT, () => {
   console.log(`Global Warfare 1939 server running on port ${PORT}`);
 });
